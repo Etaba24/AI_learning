@@ -1,0 +1,379 @@
+import {
+  Bell,
+  BookOpen,
+  ChevronDown,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PlusCircle,
+  Search,
+  Sparkles,
+  Sun,
+  UploadCloud,
+  User,
+  Users,
+  Award,
+  X,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { ROLE_LABELS } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
+import { useConfirm } from '../../components/ConfirmContext'
+import { useTheme } from '../../theme/ThemeContext'
+
+const INSTRUCTOR_NAV_GROUPS = [
+  {
+    label: 'Tableau de bord',
+    items: [{ to: '/formateur', label: 'Vue Synthétique', icon: LayoutDashboard, end: true }],
+  },
+  {
+    label: 'Espace Pédagogique',
+    items: [
+      { to: '/formateur/mes-formations', label: 'Mes Formations', icon: BookOpen, end: false },
+      { to: '/formateur/creer-formation', label: 'Créer un cours', icon: PlusCircle, end: false },
+      { to: '/formateur/evaluations', label: 'Quiz & Évaluations', icon: Award, end: false },
+    ],
+  },
+  {
+    label: 'Suivi & Ressources',
+    items: [
+      { to: '/formateur/apprenants', label: 'Mes Apprenants', icon: Users, end: false },
+      { to: '/formateur/bibliotheque', label: 'Bibliothèque & Supports', icon: UploadCloud, end: false },
+    ],
+  },
+]
+
+const INSTRUCTOR_PAGE_TITLES: Record<string, { category: string; title: string; subtitle: string }> = {
+  '/formateur': { category: 'Pilotage', title: 'Tableau de bord Formateur', subtitle: 'Suivi global de vos cours, inscrits et indicateurs pédagogiques.' },
+  '/formateur/mes-formations': { category: 'Espace Pédagogique', title: 'Mes Formations', subtitle: 'Gérez le statut, les modules et les leçons de vos cours.' },
+  '/formateur/creer-formation': { category: 'Espace Pédagogique', title: 'Créer une nouvelle formation', subtitle: 'Concevez votre programme et soumettez-le à la modération.' },
+  '/formateur/evaluations': { category: 'Espace Pédagogique', title: 'Quiz & Évaluations', subtitle: 'Consultez les résultats de vos apprenants aux exercices.' },
+  '/formateur/apprenants': { category: 'Suivi & Ressources', title: 'Suivi des Apprenants', subtitle: 'Analysez l’avancement individuel et communiquez avec vos élèves.' },
+  '/formateur/bibliotheque': { category: 'Suivi & Ressources', title: 'Bibliothèque & Supports', subtitle: 'Publiez des documents PDF/EPUB avec couverture automatique 3D.' },
+}
+
+export function InstructorLayout() {
+  const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
+  const confirm = useConfirm()
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const notifRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const initial = (user?.first_name || user?.email || '?').charAt(0).toUpperCase()
+  const userName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email.split('@')[0] : 'Formateur'
+  const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || userName
+
+  const currentPageInfo = INSTRUCTOR_PAGE_TITLES[location.pathname] || {
+    category: 'Espace Formateur',
+    title: 'Console Pédagogique',
+    subtitle: 'Espace de gestion des cours et supports d’apprentissage.',
+  }
+
+  async function handleLogoutClick() {
+    const ok = await confirm({
+      title: 'Se déconnecter ?',
+      message: 'Êtes-vous sûr de vouloir fermer votre session formateur ?',
+      confirmLabel: 'Déconnexion',
+      variant: 'warning',
+    })
+    if (ok) {
+      logout()
+    }
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+      {/* Overlay Mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* BARRE LATÉRALE (SIDEBAR FORMATEUR) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex h-full shrink-0 flex-col border-r border-slate-200 bg-white transition-all duration-300 md:static md:translate-x-0 dark:border-slate-800 dark:bg-slate-900 ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'
+          } ${isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full'}`}
+      >
+        {/* LOGO PLATEFORME & BADGE FORMATEUR */}
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-sky-600 to-indigo-700 text-sm font-extrabold text-white shadow-md shadow-indigo-500/20">
+              <GraduationCap size={20} />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="min-w-0">
+                <span className="block truncate text-base font-extrabold text-slate-900 dark:text-white">
+                  AI Learning
+                </span>
+                <span className="block text-[10px] font-bold tracking-wider text-indigo-600 uppercase dark:text-indigo-400">
+                  Espace Formateur
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 md:hidden dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* NAVIGATION PAR GROUPES */}
+        <nav className="flex-1 space-y-6 overflow-y-auto p-3">
+          {INSTRUCTOR_NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              {!isSidebarCollapsed && (
+                <p className="px-3 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+                  {group.label}
+                </p>
+              )}
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      onClick={() => setIsSidebarOpen(false)}
+                      title={isSidebarCollapsed ? item.label : undefined}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all ${isActive
+                          ? 'bg-indigo-50 text-indigo-900 shadow-sm dark:bg-indigo-500/15 dark:text-indigo-300 font-bold'
+                          : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200'
+                        } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`
+                      }
+                    >
+                      <Icon size={18} className="shrink-0" />
+                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* COLLAPSE SIDEBAR */}
+        <div className="border-t border-slate-200 p-3 dark:border-slate-800">
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="hidden w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 md:flex dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
+            title={isSidebarCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {!isSidebarCollapsed && <span>Réduire la barre</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* CONTENU ET HEADER ERGONOMIQUE */}
+      <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+        {/* HEADER */}
+        <header className="shrink-0 z-20 flex items-center justify-between border-b border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur-md sm:px-6 dark:border-slate-800/80 dark:bg-slate-900/80">
+          {/* GAUCHE : TOGGLE + TITRE */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 md:hidden dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            >
+              <Menu size={20} />
+            </button>
+
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="hidden md:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800"
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                <span>Formateur</span>
+                <span>/</span>
+                <span className="text-indigo-600 dark:text-indigo-400">{currentPageInfo.category}</span>
+              </div>
+              <h1 className="truncate text-base font-bold text-slate-900 sm:text-lg dark:text-slate-100">
+                {currentPageInfo.title}
+              </h1>
+            </div>
+          </div>
+
+          {/* CENTRE : RECHERCHE */}
+          <div className="relative hidden max-w-xs flex-1 px-4 lg:block">
+            <div className="relative flex items-center">
+              <Search size={16} className="absolute left-3 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher une de vos leçons, un élève..."
+                className="w-full rounded-2xl border border-slate-200/90 bg-slate-50/90 py-2 pl-9 pr-10 text-xs font-medium text-slate-900 placeholder-slate-400 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder-slate-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* DROITE : THEME + NOTIFS + PROFIL */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={toggleTheme}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+            >
+              {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-slate-600" />}
+            </button>
+
+            {/* NOTIFICATIONS */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <Bell size={18} />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-indigo-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl animate-[popup-in_0.25s_cubic-bezier(0.16,1,0.3,1)] dark:border-slate-800 dark:bg-slate-900">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                    <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">Notifications Formateur</h3>
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                      2 récentes
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 py-3">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-900/30 dark:bg-emerald-500/10">
+                      <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                        Nouveau suivi d'apprenant
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+                        3 nouveaux apprenants ont rejoint votre cours React & TypeScript.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/30 dark:bg-indigo-500/10">
+                      <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                        Formation Validée
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-indigo-800/80 dark:text-indigo-300/80">
+                        Votre cours a été validé par l'administration et est publié.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+
+            {/* PROFIL MENU */}
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white p-1 pr-2.5 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-sm">
+                  {initial}
+                </div>
+                <div className="hidden text-left sm:block">
+                  <p className="text-xs font-bold leading-tight text-slate-900 dark:text-slate-100">{userName}</p>
+                  <p className="text-[10px] font-medium leading-none text-slate-400">
+                    {user ? ROLE_LABELS[user.role] : 'Formateur'}
+                  </p>
+                </div>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl animate-[popup-in_0.25s_cubic-bezier(0.16,1,0.3,1)] dark:border-slate-800 dark:bg-slate-900">
+                  <div className="border-b border-slate-100 px-2 pb-3 dark:border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-sm font-bold text-white">
+                        {initial}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{userFullName}</p>
+                        <p className="truncate text-[11px] text-slate-400">{user?.email}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      <Sparkles size={11} />
+                      Formateur Enseignant
+                    </div>
+                  </div>
+
+                  <div className="py-2 space-y-1">
+                    <NavLink
+                      to="/formateur/mes-formations"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <User size={15} className="text-slate-400" />
+                      Gérer mes formations
+                    </NavLink>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-2 dark:border-slate-800">
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false)
+                        handleLogoutClick()
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                    >
+                      <LogOut size={15} />
+                      Se déconnecter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* CONTENU DE LA PAGE */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  )
+}

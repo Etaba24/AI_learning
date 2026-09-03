@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* Dark mode piloté par une classe .dark (posée sur <html> par ThemeContext)
+   plutôt que uniquement par les préférences OS -> permet un vrai bouton de
+   bascule clair/sombre. */
+@variant dark (&:where(.dark, .dark *));
+
+html {
+  scroll-behavior: smooth;
+}
+
+[id] {
+  scroll-margin-top: 5.5rem;
+}
+
+body {
+  margin: 0;
+}
+
+/* Bandeau défilant de HomePage.tsx (id #vision) */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Timeline animée du hero de HomePage.tsx : un point lumineux qui voyage le
+   long de la ligne verticale, en s'arrêtant sur chacune des 3 cartes. */
+@keyframes travel-dot {
+  0%   { top: 8%;  opacity: 0; }
+  4%   { top: 8%;  opacity: 1; }
+  28%  { top: 8%;  opacity: 1; }
+  38%  { top: 50%; opacity: 1; }
+  62%  { top: 50%; opacity: 1; }
+  72%  { top: 92%; opacity: 1; }
+  96%  { top: 92%; opacity: 1; }
+  100% { top: 92%; opacity: 0; }
+}
+
+/* Une keyframe par carte, synchronisée sur le moment où le point s'arrête dessus */
+@keyframes card-glow-1 {
+  0%, 2%, 32%, 100% { border-color: #e2e8f0; box-shadow: none; }
+  6%, 26% { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.15); }
+}
+@keyframes card-glow-2 {
+  0%, 34%, 66%, 100% { border-color: #e2e8f0; box-shadow: none; }
+  40%, 60% { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15); }
+}
+@keyframes card-glow-3 {
+  0%, 68%, 98%, 100% { border-color: #e2e8f0; box-shadow: none; }
+  74%, 94% { border-color: #34d399; box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.15); }
+}
+
+/* Globe tournant de la section "À propos" : la carte du monde défile
+   horizontalement (elle se raccorde parfaitement, une largeur = 480px)
+   -> illusion de rotation sans avoir besoin de vraie 3D. */
+@keyframes globe-spin {
+  from { background-position-x: 0; }
+  to   { background-position-x: -480px; }
+}
+
+/* Lignes du réseau international superposé au globe : le tiret "voyage"
+   le long du trait pour suggérer une connexion active. */
+@keyframes line-flow {
+  to { stroke-dashoffset: -24; }
+}
+
+/* Popups (Modal, ConfirmDialog) : voile qui s'estompe + carte qui arrive en
+   douceur avec effet de rebond dynamique */
+@keyframes backdrop-in {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to   { opacity: 1; backdrop-filter: blur(8px); }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; backdrop-filter: blur(8px); }
+  to   { opacity: 0; backdrop-filter: blur(0px); }
+}
+
+@keyframes popup-in {
+  0% { opacity: 0; transform: scale(0.88) translateY(20px); }
+  60% { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes popup-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.92) translateY(12px); }
+}
+
+/* Micro-animations d'icônes */
+@keyframes icon-pop {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.25) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.18); opacity: 0.35; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* Dynamic Toast animations */
+@keyframes toast-in-right {
+  0% { opacity: 0; transform: translateX(100%) translateY(-10px) scale(0.85); }
+  70% { opacity: 1; transform: translateX(-8px) translateY(0) scale(1.02); }
+  100% { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+
+@keyframes toast-out-right {
+  0% { opacity: 1; transform: translateX(0) scale(1); max-height: 120px; }
+  100% { opacity: 0; transform: translateX(120%) scale(0.8); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+
+@keyframes toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+@keyframes alert-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+@keyframes alert-slide-down {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Typographie ultra-stylée, raffinée et équilibrée (non lourde) pour les titres de formation */
+.font-formation-title {
+  font-family: 'Urbanist', 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+
