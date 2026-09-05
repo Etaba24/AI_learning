@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ModalProps {
   open: boolean
@@ -12,6 +13,7 @@ interface ModalProps {
  * (Apprenants, Formateurs, Catégories...) — supporte la fermeture par la touche Échap,
  * animations d'entrée/sortie fluides et voile avec flou d'arrière-plan. */
 export function Modal({ open, onClose, title, children }: ModalProps) {
+  const { t } = useTranslation()
   const [shouldRender, setShouldRender] = useState(open)
   const [isClosing, setIsClosing] = useState(false)
 
@@ -63,7 +65,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             <button
               onClick={onClose}
               className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-              aria-label="Fermer"
+              aria-label={t('confirm.closeAria')}
             >
               <X size={18} />
             </button>

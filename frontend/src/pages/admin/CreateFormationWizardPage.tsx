@@ -17,7 +17,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import {
   NIVEAU_LABELS,
@@ -56,7 +56,7 @@ interface LeconWizard {
   videoUrl: string
   videoDureeMin: number
   contenuTextuel: string
-  support: SupportDocument
+  support: SupportDocument | null
   exercices: QuestionQuiz[]
 }
 
@@ -68,9 +68,32 @@ interface ModuleWizard {
   lecons: LeconWizard[]
 }
 
+// Brouillon persistant localement (localStorage) — permet de reprendre
+// l'assistant exactement là où il a été laissé après une déconnexion
+// involontaire, sans dépendre d'une sauvegarde manuelle. Limite assumée :
+// ne survit que dans ce navigateur précis (pas de persistance serveur tant
+// que la formation n'a pas été réellement créée via handleFinalSubmit).
+interface WizardDraft {
+  titre: string
+  description: string
+  objectifs: string
+  prerequis: string
+  niveau: Niveau
+  dureeHeures: string
+  categorieId: string
+  departementId: string
+  modules: ModuleWizard[]
+  currentStep: 1 | 2 | 3 | 4
+  savedAt: string
+}
+
+const DRAFT_KEY_PREFIX = 'ai-learning:wizard-formation-draft:'
+
 export function CreateFormationWizardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { id } = useParams()
+  const isEditing = Boolean(id)
   const { showToast } = useToast()
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
@@ -129,6 +152,187 @@ export function CreateFormationWizardPage() {
 
   // État de sauvegarde & publication API
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingLessonMedia, setIsUploadingLessonMedia] = useState(false)
+
+  // BROUILLON AUTOMATIQUE — clé isolée par utilisateur (poste partagé)
+  const draftKey = `${DRAFT_KEY_PREFIX}${user?.id ?? 'anon'}`
+  const [isDraftHydrated, setIsDraftHydrated] = useState(false)
+  const [restoredDraftAt, setRestoredDraftAt] = useState<string | null>(null)
+
+  // Restauration du brouillon au montage (une seule fois, avant l'autosave).
+  // En mode édition, la formation serveur prime sur le brouillon local :
+  // l’utilisateur doit reprendre directement l’édition du cours existant.
+  useEffect(() => {
+    if (isEditing) {
+      setIsDraftHydrated(true)
+      return
+    }
+
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (raw) {
+        const draft = JSON.parse(raw) as WizardDraft
+        if (draft && (draft.titre?.trim() || (draft.modules?.length ?? 0) > 0)) {
+          setTitre(draft.titre || '')
+          setDescription(draft.description || '')
+          setObjectifs(draft.objectifs || '')
+          setPrerequis(draft.prerequis || '')
+          setNiveau(draft.niveau || 'DEBUTANT')
+          setDureeHeures(draft.dureeHeures || '10')
+          setCategorieId(draft.categorieId || '')
+          setDepartementId(draft.departementId || '')
+          setModules(draft.modules || [])
+          setCurrentStep(draft.currentStep || 1)
+          setRestoredDraftAt(draft.savedAt || null)
+        }
+      }
+    } catch {
+      // Brouillon corrompu ou localStorage indisponible : on repart d'un
+      // formulaire vierge plutôt que de bloquer l'assistant.
+    } finally {
+      setIsDraftHydrated(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing])
+
+  useEffect(() => {
+    if (!isEditing || !id) return
+
+    let cancelled = false
+
+    apiFetch<Formation>(`/formations/${id}/`)
+      .then((data) => {
+        if (cancelled) return
+
+        setTitre(data.titre || '')
+        setDescription(data.description || '')
+        setObjectifs(data.objectifs || '')
+        setPrerequis(data.prerequis || '')
+        setNiveau(data.niveau || 'DEBUTANT')
+        setDureeHeures(String(data.duree_heures || 10))
+        setCategorieId(data.categorie || '')
+        setDepartementId(data.departement || '')
+        setModules(
+          (data.modules || []).map((module, moduleIndex) => ({
+            id: module.id,
+            titre: module.titre,
+            description: module.description || '',
+            ordre: Number(module.ordre ?? moduleIndex + 1),
+            lecons: (module.lecons || []).map((lecon) => ({
+              id: lecon.id,
+              titre: lecon.titre || '',
+              videoUrl: lecon.video_url || '',
+              videoDureeMin: 12,
+              contenuTextuel: lecon.contenu || '',
+              support: lecon.ressources && lecon.ressources[0]
+                ? {
+                    id: lecon.ressources[0].id,
+                    nom: lecon.ressources[0].nom,
+                    type: lecon.ressources[0].type === 'PDF' ? 'PDF' : 'DOCUMENT',
+                    url: lecon.ressources[0].url,
+                  }
+                : null,
+              exercices: (lecon.exercices || []).map((exercise) => ({
+                id: exercise.id,
+                question: exercise.enonce || '',
+                optionA: 'Option A',
+                optionB: 'Option B',
+                optionC: 'Option C',
+                optionD: 'Option D',
+                correctOption: 'A',
+                explication: exercise.correction || '',
+              })),
+            })),
+          }))
+        )
+        setSelectedModuleIdIndex(0)
+        setCurrentStep(1)
+        setRestoredDraftAt(null)
+      })
+      .catch((err) => {
+        showToast('error', err instanceof ApiError ? err.message : 'Impossible de charger la formation à modifier.', 'Erreur de chargement')
+      })
+      .finally(() => {
+        if (!cancelled) setIsDraftHydrated(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, isEditing, showToast])
+
+  // Sauvegarde automatique et debouncée du brouillon — aucune action
+  // manuelle requise, se déclenche à chaque modification significative.
+  useEffect(() => {
+    if (!isDraftHydrated || isEditing) return
+
+    const hasContent = titre.trim().length > 0 || modules.length > 0
+    if (!hasContent) {
+      try {
+        localStorage.removeItem(draftKey)
+      } catch {
+        // ignoré
+      }
+      return
+    }
+
+    const timer = setTimeout(() => {
+      const draft: WizardDraft = {
+        titre,
+        description,
+        objectifs,
+        prerequis,
+        niveau,
+        dureeHeures,
+        categorieId,
+        departementId,
+        modules,
+        currentStep,
+        savedAt: new Date().toISOString(),
+      }
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(draft))
+      } catch {
+        // Stockage plein/indisponible : l'assistant reste utilisable, seule
+        // la reprise automatique après déconnexion est perdue.
+      }
+    }, 600)
+
+    return () => clearTimeout(timer)
+  }, [
+    isDraftHydrated,
+    isEditing,
+    draftKey,
+    titre,
+    description,
+    objectifs,
+    prerequis,
+    niveau,
+    dureeHeures,
+    categorieId,
+    departementId,
+    modules,
+    currentStep,
+  ])
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(draftKey)
+    } catch {
+      // ignoré
+    }
+    setTitre('')
+    setDescription('')
+    setObjectifs('')
+    setPrerequis('')
+    setNiveau('DEBUTANT')
+    setDureeHeures('10')
+    setModules([])
+    setCurrentStep(1)
+    setRestoredDraftAt(null)
+    if (categories.length > 0) setCategorieId(categories[0].id)
+    if (departements.length > 0) setDepartementId(departements[0].id)
+  }
 
   // Chargement des données
   useEffect(() => {
@@ -207,54 +411,85 @@ export function CreateFormationWizardPage() {
     }
   }
 
+  // Envoie réellement le fichier au serveur (stockage disque réel) et
+  // renvoie l'URL permanente qui en résulte — jamais un URL.createObjectURL,
+  // qui ne serait valide que dans cet onglet précis et disparaîtrait au
+  // moindre rechargement (c'est ce qui rendait vidéos/supports illisibles).
+  async function uploadFichierLecon(file: File, endpoint: string): Promise<string> {
+    const formData = new FormData()
+    formData.append('fichier', file)
+    const result = await apiFetch<{ video_url?: string; url?: string }>(endpoint, {
+      method: 'POST',
+      body: formData,
+    })
+    return result.video_url ?? result.url ?? ''
+  }
+
   // GESTION DES LEÇONS
-  function handleAddLesson(e: React.FormEvent) {
+  async function handleAddLesson(e: React.FormEvent) {
     e.preventDefault()
     if (!newLessonTitle.trim()) return
 
     const currentMod = modules[selectedModuleIdIndex]
     if (!currentMod) return
 
-    const finalVideoUrl = videoFile
-      ? URL.createObjectURL(videoFile)
-      : newLessonVideoUrl || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    setIsUploadingLessonMedia(true)
+    try {
+      // Vidéo et support sont deux enrichissements optionnels — s'ils ne
+      // sont pas fournis, la leçon reste valide sans eux plutôt que de
+      // recevoir un contenu inventé (fausse vidéo YouTube, faux PDF...).
+      let finalVideoUrl = ''
+      if (videoSourceMode === 'FILE' && videoFile) {
+        finalVideoUrl = await uploadFichierLecon(videoFile, '/lecons/videos/upload/')
+      } else if (videoSourceMode === 'URL' && newLessonVideoUrl.trim()) {
+        finalVideoUrl = newLessonVideoUrl.trim()
+      }
 
-    const finalDocName = docFile
-      ? docFile.name
-      : newLessonDocName || `${newLessonTitle.replace(/\s+/g, '_')}_Support.pdf`
+      let finalSupport: SupportDocument | null = null
+      if (docSourceMode === 'FILE' && docFile) {
+        const url = await uploadFichierLecon(docFile, '/lecons/ressources/upload/')
+        finalSupport = { id: `doc-${Date.now()}`, nom: docFile.name, type: 'PDF', url }
+      } else if (docSourceMode === 'URL' && newLessonDocUrl.trim()) {
+        finalSupport = {
+          id: `doc-${Date.now()}`,
+          nom: newLessonDocName.trim() || `${newLessonTitle.replace(/\s+/g, '_')}_Support.pdf`,
+          type: 'PDF',
+          url: newLessonDocUrl.trim(),
+        }
+      }
 
-    const finalDocUrl = docFile
-      ? URL.createObjectURL(docFile)
-      : newLessonDocUrl || 'https://example.com/docs/support.pdf'
+      const newLec: LeconWizard = {
+        id: `lec-${Date.now()}`,
+        titre: newLessonTitle,
+        videoUrl: finalVideoUrl,
+        videoDureeMin: Number(newLessonVideoDuree) || 10,
+        contenuTextuel: newLessonContent,
+        support: finalSupport,
+        exercices: [],
+      }
 
-    const newLec: LeconWizard = {
-      id: `lec-${Date.now()}`,
-      titre: newLessonTitle,
-      videoUrl: finalVideoUrl,
-      videoDureeMin: Number(newLessonVideoDuree) || 10,
-      contenuTextuel: newLessonContent || 'Détails du cours et transcription pédagogique.',
-      support: {
-        id: `doc-${Date.now()}`,
-        nom: finalDocName,
-        type: 'PDF',
-        url: finalDocUrl,
-      },
-      exercices: [],
+      const updatedModules = [...modules]
+      updatedModules[selectedModuleIdIndex].lecons.push(newLec)
+      setModules(updatedModules)
+
+      setIsAddLessonOpen(false)
+      setNewLessonTitle('')
+      setNewLessonVideoUrl('')
+      setNewLessonContent('')
+      setNewLessonDocName('')
+      setNewLessonDocUrl('')
+      setVideoFile(null)
+      setDocFile(null)
+      showToast('success', `La leçon "${newLec.titre}" a été ajoutée au module.`, 'Leçon créée')
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof ApiError ? err.message : "Impossible d'importer le fichier.",
+        "Échec de l'envoi",
+      )
+    } finally {
+      setIsUploadingLessonMedia(false)
     }
-
-    const updatedModules = [...modules]
-    updatedModules[selectedModuleIdIndex].lecons.push(newLec)
-    setModules(updatedModules)
-
-    setIsAddLessonOpen(false)
-    setNewLessonTitle('')
-    setNewLessonVideoUrl('')
-    setNewLessonContent('')
-    setNewLessonDocName('')
-    setNewLessonDocUrl('')
-    setVideoFile(null)
-    setDocFile(null)
-    showToast('success', `La leçon "${newLec.titre}" a été ajoutée au module.`, 'Leçon créée')
   }
 
   function handleRemoveLesson(modIndex: number, lecId: string) {
@@ -329,15 +564,32 @@ export function CreateFormationWizardPage() {
     }
 
     try {
-      // 1. Enregistrement de la Formation dans le backend Python
-      const createdFormation = await apiFetch<Formation>('/formations/', {
-        method: 'POST',
-        body: payload,
-      })
+      let formationId = id ?? ''
 
-      // 2. Enregistrement des Modules dans le backend Python
+      if (isEditing && id) {
+        await apiFetch<Formation>(`/formations/${id}/`, {
+          method: 'PATCH',
+          body: payload,
+        })
+
+        const existingModules = await apiFetch<Array<{ id: string }>>(`/formations/${id}/modules/`)
+        for (const module of existingModules) {
+          const lecons = await apiFetch<Array<{ id: string }>>(`/modules/${module.id}/lecons/`)
+          for (const lecon of lecons) {
+            await apiFetch(`/modules/${module.id}/lecons/${lecon.id}/`, { method: 'DELETE' })
+          }
+          await apiFetch(`/formations/${id}/modules/${module.id}/`, { method: 'DELETE' })
+        }
+      } else {
+        const createdFormation = await apiFetch<Formation>('/formations/', {
+          method: 'POST',
+          body: payload,
+        })
+        formationId = createdFormation.id
+      }
+
       for (const modItem of modules) {
-        const createdModule = await apiFetch<{ id: string }>(`/formations/${createdFormation.id}/modules/`, {
+        const createdModule = await apiFetch<{ id: string }>(`/formations/${formationId}/modules/`, {
           method: 'POST',
           body: {
             titre: modItem.titre,
@@ -346,7 +598,6 @@ export function CreateFormationWizardPage() {
           },
         })
 
-        // 3. Enregistrement des Leçons sous chaque module en Python
         for (const lecItem of modItem.lecons) {
           const createdLecon = await apiFetch<{ id: string }>(`/modules/${createdModule.id}/lecons/`, {
             method: 'POST',
@@ -358,19 +609,17 @@ export function CreateFormationWizardPage() {
             },
           })
 
-          // 4. Enregistrement des Supports Numériques en Python
-          if (lecItem.support && lecItem.support.nom) {
+          if (lecItem.support && lecItem.support.url) {
             await apiFetch(`/lecons/${createdLecon.id}/ressources/`, {
               method: 'POST',
               body: {
                 nom: lecItem.support.nom,
-                type: lecItem.support.type || 'PDF',
-                url: lecItem.support.url || 'https://example.com/docs/support.pdf',
+                type: lecItem.support.type,
+                url: lecItem.support.url,
               },
             })
           }
 
-          // 5. Enregistrement des Exercices & Quizzes en Python
           for (const qItem of lecItem.exercices) {
             await apiFetch(`/lecons/${createdLecon.id}/exercices/`, {
               method: 'POST',
@@ -383,26 +632,35 @@ export function CreateFormationWizardPage() {
         }
       }
 
-      // 6. Application des règles métier de transition de statut en Python (RG-001/RG-002/RG-003)
       if (targetStatut === 'PUBLIEE') {
         if (user?.role === 'ADMIN') {
-          await apiFetch(`/formations/${createdFormation.id}/publish/`, { method: 'POST' })
+          await apiFetch(`/formations/${formationId}/publish/`, { method: 'POST' })
         } else {
-          // Un formateur soumet pour validation par l'admin
-          await apiFetch(`/formations/${createdFormation.id}/submit/`, { method: 'POST' })
+          await apiFetch(`/formations/${formationId}/submit/`, { method: 'POST' })
         }
       } else if (targetStatut === 'SOUMISE') {
-        await apiFetch(`/formations/${createdFormation.id}/submit/`, { method: 'POST' })
+        await apiFetch(`/formations/${formationId}/submit/`, { method: 'POST' })
       }
 
-      const successMsg =
-        targetStatut === 'PUBLIEE'
+      const successMsg = isEditing
+        ? targetStatut === 'PUBLIEE'
+          ? user?.role === 'ADMIN'
+            ? `La formation "${titre}" a été mise à jour et publiée avec succès !`
+            : `La formation "${titre}" a été mise à jour et soumise à l'Administrateur pour validation !`
+          : `La formation "${titre}" a été mise à jour avec succès.`
+        : targetStatut === 'PUBLIEE'
           ? user?.role === 'ADMIN'
             ? `La formation "${titre}" a été créée et publiée avec succès !`
             : `La formation "${titre}" a été enregistrée et soumise à l'Administrateur pour validation !`
           : `La formation "${titre}" a été enregistrée en brouillon.`
 
       showToast('success', successMsg, 'Succès Pédagogique')
+
+      try {
+        localStorage.removeItem(draftKey)
+      } catch {
+        // ignoré
+      }
 
       if (user?.role === 'ADMIN') {
         navigate('/admin/formations')
@@ -457,6 +715,23 @@ export function CreateFormationWizardPage() {
           </div>
         </div>
       </div>
+
+      {/* BANNIÈRE DE REPRISE DE BROUILLON AUTOMATIQUE */}
+      {restoredDraftAt && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <span>
+            Brouillon restauré automatiquement (dernière sauvegarde le{' '}
+            {new Date(restoredDraftAt).toLocaleString('fr-FR')}) — vous reprenez exactement là où vous vous étiez arrêté.
+          </span>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="shrink-0 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10"
+          >
+            Ignorer et repartir de zéro
+          </button>
+        </div>
+      )}
 
       {/* BARRE D'ÉTAPES SÉQUENTIELLES (STEPPER) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -865,7 +1140,7 @@ export function CreateFormationWizardPage() {
                                 className="inline-flex items-center gap-1.5 rounded-xl bg-sky-100 px-3 py-1 text-[10px] font-extrabold text-sky-700 hover:bg-sky-200 dark:bg-sky-950/60 dark:text-sky-300 transition-all"
                               >
                                 <Eye size={13} />
-                                <span>👁️ Consulter la leçon</span>
+                                <span>Consulter la leçon</span>
                               </button>
                             </div>
 
@@ -887,7 +1162,7 @@ export function CreateFormationWizardPage() {
                                 <span>1. Vidéo de cours</span>
                               </div>
                               <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300 truncate">
-                                {lec.videoUrl}
+                                {lec.videoUrl || 'Aucune vidéo'}
                               </p>
                               <span className="block mt-1 text-[9px] font-semibold text-slate-400">
                                 Durée : {lec.videoDureeMin} min
@@ -912,7 +1187,7 @@ export function CreateFormationWizardPage() {
                                 <span>3. Support PDF</span>
                               </div>
                               <p className="text-[10px] font-semibold text-slate-800 dark:text-slate-200 truncate">
-                                📄 {lec.support.nom}
+                                {lec.support ? lec.support.nom : 'Aucun document'}
                               </p>
                             </div>
 
@@ -1053,9 +1328,9 @@ export function CreateFormationWizardPage() {
                       <div key={l.id} className="flex items-center justify-between text-[11px] font-medium text-slate-600 dark:text-slate-300">
                         <span>• {l.titre}</span>
                         <div className="flex items-center gap-2 text-[10px] font-bold">
-                          <span className="text-sky-600">🎥 Vidéo</span>
-                          <span className="text-emerald-600">📄 PDF</span>
-                          <span className="text-amber-600">✏️ {l.exercices.length} Quiz</span>
+                          <span className="text-sky-600">Vidéo</span>
+                          <span className="text-emerald-600">PDF</span>
+                          <span className="text-amber-600">{l.exercices.length} Quiz</span>
                         </div>
                       </div>
                     ))}
@@ -1141,7 +1416,7 @@ export function CreateFormationWizardPage() {
                       onClick={() => setVideoSourceMode('FILE')}
                       className={`px-2.5 py-1 rounded-lg transition-all ${videoSourceMode === 'FILE' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-500'}`}
                     >
-                      📁 Fichier Vidéo
+                      Fichier Vidéo
                     </button>
                     <button
                       type="button"
@@ -1221,7 +1496,7 @@ export function CreateFormationWizardPage() {
                       onClick={() => setDocSourceMode('FILE')}
                       className={`px-2.5 py-1 rounded-lg transition-all ${docSourceMode === 'FILE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500'}`}
                     >
-                      📁 Importer Document
+                      Importer Document
                     </button>
                     <button
                       type="button"
@@ -1276,15 +1551,17 @@ export function CreateFormationWizardPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddLessonOpen(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  disabled={isUploadingLessonMedia}
+                  className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="rounded-2xl bg-sky-600 px-5 py-2 text-xs font-extrabold text-white hover:bg-sky-700 shadow-md"
+                  disabled={isUploadingLessonMedia}
+                  className="rounded-2xl bg-sky-600 px-5 py-2 text-xs font-extrabold text-white hover:bg-sky-700 shadow-md disabled:opacity-50"
                 >
-                  Enregistrer la leçon
+                  {isUploadingLessonMedia ? 'Envoi des fichiers...' : 'Enregistrer la leçon'}
                 </button>
               </div>
             </form>
@@ -1437,10 +1714,14 @@ export function CreateFormationWizardPage() {
                     <Video size={16} /> 1. Support Vidéo ({selectedLessonToView.videoDureeMin} min)
                   </h4>
                   <span className="text-[10px] font-mono text-slate-500 truncate max-w-[220px]">
-                    {selectedLessonToView.videoUrl}
+                    {selectedLessonToView.videoUrl || 'Aucune vidéo'}
                   </span>
                 </div>
-                {selectedLessonToView.videoUrl.startsWith('blob:') ? (
+                {!selectedLessonToView.videoUrl ? (
+                  <p className="rounded-xl bg-slate-100 p-4 text-center text-xs text-slate-400 dark:bg-slate-800">
+                    Aucune vidéo n'a été ajoutée à cette leçon.
+                  </p>
+                ) : /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(selectedLessonToView.videoUrl) ? (
                   <video src={selectedLessonToView.videoUrl} controls className="w-full rounded-xl max-h-56 bg-black" />
                 ) : (
                   <div className="rounded-xl bg-slate-900 p-4 text-center text-xs text-sky-300 font-mono overflow-x-auto">
@@ -1466,25 +1747,31 @@ export function CreateFormationWizardPage() {
                 <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
                   <BookOpen size={16} /> 3. Document de Support Pédagogique
                 </h4>
-                <div className="flex items-center justify-between rounded-xl bg-white p-3 dark:bg-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">📄</span>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                        {selectedLessonToView.support.nom}
-                      </p>
-                      <p className="text-[10px] text-slate-400">Format PDF / Fiche de révision</p>
+                {selectedLessonToView.support ? (
+                  <div className="flex items-center justify-between rounded-xl bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl"></span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                          {selectedLessonToView.support.nom}
+                        </p>
+                        <p className="text-[10px] text-slate-400">Format PDF / Fiche de révision</p>
+                      </div>
                     </div>
+                    <a
+                      href={selectedLessonToView.support.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm"
+                    >
+                      Télécharger
+                    </a>
                   </div>
-                  <a
-                    href={selectedLessonToView.support.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm"
-                  >
-                    Télécharger
-                  </a>
-                </div>
+                ) : (
+                  <p className="rounded-xl bg-slate-100 p-3 text-center text-xs text-slate-400 dark:bg-slate-800">
+                    Aucun document n'a été ajouté à cette leçon.
+                  </p>
+                )}
               </div>
 
               {/* VOLET 4 : EXERCICE & QUESTIONS QCM */}
@@ -1518,7 +1805,7 @@ export function CreateFormationWizardPage() {
                         </div>
                         {ex.explication && (
                           <p className="text-[10px] italic text-slate-500 bg-slate-50 p-2 rounded-lg dark:bg-slate-900">
-                            💡 Explication : {ex.explication}
+                            Explication : {ex.explication}
                           </p>
                         )}
                       </div>

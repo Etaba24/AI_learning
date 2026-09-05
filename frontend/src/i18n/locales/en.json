@@ -1,0 +1,488 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "loading": "Loading...",
+    "close": "Close",
+    "confirm": "Confirm",
+    "pagination": {
+      "previousAria": "Previous page",
+      "nextAria": "Next page",
+      "pageIndicator": "Page {{page}} / {{totalPages}}",
+      "range": "{{from}}–{{to}} of {{count}}"
+    }
+  },
+  "confirm": {
+    "badge": {
+      "danger": "Irreversible action",
+      "warning": "Attention required",
+      "info": "Confirmation",
+      "success": "Confirmed"
+    },
+    "cancelLabel": "Cancel",
+    "deleteLabel": "Delete",
+    "confirmLabel": "Confirm",
+    "closeAria": "Close"
+  },
+  "toast": {
+    "title": {
+      "success": "Success",
+      "error": "Error",
+      "warning": "Warning",
+      "info": "Information"
+    },
+    "closeAria": "Close notification"
+  },
+  "auth": {
+    "backHome": "← AI Learning",
+    "loginPanel": {
+      "title": "Welcome back!",
+      "subtitle": "Already have an account? Sign in to continue your journey.",
+      "cta": "Sign in"
+    },
+    "registerPanel": {
+      "title": "Welcome!",
+      "subtitle": "New to AI Learning? Create your student account in a few seconds.",
+      "cta": "Sign up"
+    },
+    "formTitle": {
+      "login": "Sign in",
+      "register": "Create an account"
+    },
+    "fullNameLabel": "Full name",
+    "fullNamePlaceholder": "e.g. John Smith",
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@example.com",
+    "passwordLabel": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submitting": "One moment...",
+    "submit": {
+      "login": "Sign in",
+      "register": "Sign up"
+    },
+    "genericError": "Unable to reach the server.",
+    "orDivider": "or",
+    "googleUnavailable": "Google sign-in unavailable right now",
+    "googleError": "Google sign-in failed. Please try again.",
+    "verify": {
+      "title": "Check your email",
+      "subtitle": "A 4-digit code was sent to {{email}}. Enter it to create your account.",
+      "codeLabel": "Verification code",
+      "submit": "Confirm and create my account",
+      "back": "← Use another sign-in method",
+      "genericError": "Invalid code, please try again."
+    },
+    "forgotLink": "Forgot your password?",
+    "forgot": {
+      "title": "Forgot password",
+      "subtitle": "Enter your email: if an account exists, a reset link will be sent to you.",
+      "submit": "Send reset link",
+      "success": "If an account exists with this email, a reset link has been sent.",
+      "back": "← Back to sign in",
+      "genericError": "Unable to reach the server."
+    }
+  },
+  "resetPassword": {
+    "title": "New password",
+    "subtitle": "Choose a new password for your account.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm",
+    "submit": "Reset password",
+    "success": "Your password has been updated. You can now sign in.",
+    "backToLogin": "Go to sign in",
+    "mismatch": "The confirmation does not match the new password.",
+    "invalidLink": "This reset link is invalid or has expired.",
+    "genericError": "An error occurred."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your account and preferences.",
+    "profile": {
+      "heading": "Profile",
+      "subtitle": "Your personal information.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email address",
+      "emailNote": "Contact an administrator to change your email address.",
+      "memberSince": "Member since",
+      "id": "ID",
+      "save": "Save changes",
+      "saved": "Profile updated.",
+      "error": "Something went wrong."
+    },
+    "security": {
+      "heading": "Security",
+      "subtitle": "Change your password.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm",
+      "submit": "Change password",
+      "success": "Password changed successfully.",
+      "mismatch": "The confirmation doesn't match the new password.",
+      "error": "Something went wrong."
+    },
+    "appearance": {
+      "heading": "Appearance",
+      "subtitle": "Customize the interface.",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": {
+      "heading": "Language",
+      "subtitle": "Choose the display language.",
+      "fr": "Français",
+      "en": "English"
+    },
+    "premium": "Premium",
+    "free": "Free",
+    "dangerZone": {
+      "heading": "Danger zone",
+      "subtitle": "This action is irreversible.",
+      "deleteButton": "Delete my account",
+      "confirmTitle": "Delete your account?",
+      "confirmMessage": "Your account will be immediately deactivated and your personal information anonymized. Your existing courses, enrollments and messages are kept (so as not to break other users' history) but will never be linked to your name again. This action is final.",
+      "confirmLabel": "Delete permanently",
+      "success": "Your account has been deleted. Goodbye!",
+      "error": "Account deletion failed."
+    }
+  },
+  "admin": {
+    "workspaceLabel": "Admin Workspace",
+    "breadcrumbRoot": "Console",
+    "closeMenuAria": "Close menu",
+    "openMenuAria": "Open menu",
+    "header": {
+      "collapseTitle": "Collapse sidebar",
+      "expandTitle": "Expand sidebar"
+    },
+    "sidebarFooter": {
+      "settingsAria": "Settings",
+      "logoutAria": "Sign out"
+    },
+    "searchPlaceholder": "Search a course, a user...",
+    "themeLight": "Switch to light mode",
+    "themeDark": "Switch to dark mode",
+    "notificationsAria": "Notifications",
+    "notifTitle": "Notifications",
+    "notif1New": "1 new",
+    "notifMarkRead": "Mark all as read",
+    "notifItemTitle": "Course pending moderation",
+    "notifItemBody": "An instructor has submitted a new course module.",
+    "notifItemTime": "10 minutes ago",
+    "notifViewAll": "View moderation center →",
+    "roleFallbackShort": "Admin",
+    "roleFallbackLong": "Administrator",
+    "profileMenuLink": "My profile & Settings",
+    "logout": "Sign out",
+    "logoutConfirm": {
+      "title": "Sign out?",
+      "message": "Are you sure you want to end your administrator session?",
+      "confirmLabel": "Sign out"
+    },
+    "fallbackPage": {
+      "category": "Console",
+      "title": "Administration",
+      "subtitle": "AI Learning platform management."
+    },
+    "nav": {
+      "pilotage": "Overview",
+      "dashboard": "Dashboard",
+      "usersAccess": "Users & Access",
+      "apprenants": "Students",
+      "formateurs": "Instructors",
+      "pedagogy": "Content & Catalog",
+      "createFormation": "Create a course",
+      "allFormations": "All courses",
+      "documents": "Library (validation)",
+      "categories": "Categories",
+      "departements": "Departments",
+      "monetization": "Monetization",
+      "etablissements": "Institutions",
+      "abonnements": "Subscriptions",
+      "security": "Security & System",
+      "logs": "Activity logs",
+      "settings": "Global settings"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Dashboard", "subtitle": "Overall view of platform activity and flows." },
+      "apprenants": { "title": "Students", "subtitle": "Student accounts, status and access." },
+      "formateurs": { "title": "Instructors", "subtitle": "Instructor accounts — creation reserved to the administrator." },
+      "createFormation": { "title": "Create a course (Step-by-Step Wizard)", "subtitle": "Methodical design of modules, lessons, videos, materials and exercises." },
+      "allFormations": { "title": "Course catalog", "subtitle": "Tracking and management of all course modules." },
+      "documents": { "title": "Library validation", "subtitle": "Moderate PDF/EPUB documents submitted by instructors." },
+      "categories": { "title": "Categories", "subtitle": "Organization and structure of course topics." },
+      "departements": { "title": "Departments", "subtitle": "An instructor can only publish within their own department." },
+      "logs": { "title": "Activity logs", "subtitle": "Security audit and traceability of sensitive actions." },
+      "settings": { "title": "Global settings", "subtitle": "General configuration and platform options." }
+    }
+  },
+  "instructor": {
+    "accountCategory": "Account",
+    "workspaceLabel": "Instructor Space",
+    "breadcrumbRoot": "Instructor",
+    "sidebarFooter": {
+      "settingsAria": "Settings",
+      "logoutAria": "Sign out"
+    },
+    "searchPlaceholder": "Search one of your lessons, a student...",
+    "themeLight": "Light mode",
+    "themeDark": "Dark mode",
+    "notifTitle": "Instructor Notifications",
+    "notif2Recent": "2 recent",
+    "notifItem1Title": "New student activity",
+    "notifItem1Body": "3 new students joined your React & TypeScript course.",
+    "notifItem2Title": "Course approved",
+    "notifItem2Body": "Your course has been approved by the administration and is published.",
+    "roleFallback": "Instructor",
+    "profileBadge": "Teaching Instructor",
+    "profileMenuLink1": "Manage my courses",
+    "profileMenuLink2": "Settings",
+    "logout": "Sign out",
+    "logoutConfirm": {
+      "title": "Sign out?",
+      "message": "Are you sure you want to end your instructor session?",
+      "confirmLabel": "Sign out"
+    },
+    "fallbackPage": {
+      "category": "Instructor Space",
+      "title": "Teaching Console",
+      "subtitle": "Course and learning materials management space."
+    },
+    "nav": {
+      "dashboardGroup": "Dashboard",
+      "dashboard": "Overview",
+      "pedagogy": "Teaching Space",
+      "mesFormations": "My Courses",
+      "creerFormation": "Create a course",
+      "evaluations": "Quizzes & Assessments",
+      "suivi": "Tracking & Resources",
+      "apprenants": "My Students",
+      "messagerie": "Messaging",
+      "bibliotheque": "Library & Materials"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Instructor Dashboard", "subtitle": "Overall tracking of your courses, enrollments and teaching metrics." },
+      "mesFormations": { "title": "My Courses", "subtitle": "Manage the status, modules and lessons of your courses." },
+      "creerFormation": { "title": "Create a new course", "subtitle": "Design your program and submit it for moderation." },
+      "evaluations": { "title": "Quizzes & Assessments", "subtitle": "Review your students' exercise results." },
+      "apprenants": { "title": "Student Tracking", "subtitle": "Analyze individual progress and communicate with your students." },
+      "messagerie": { "title": "Messaging", "subtitle": "Chat with the students who wrote to you." },
+      "bibliotheque": { "title": "Library & Materials", "subtitle": "Publish PDF/EPUB documents with automatic 3D cover." },
+      "parametres": { "title": "Settings", "subtitle": "Manage your profile, password and preferences." }
+    }
+  },
+  "student": {
+    "workspaceLabel": "Student Space",
+    "breadcrumbRoot": "Student Space",
+    "closeMenuAria": "Close menu",
+    "openMenuAria": "Open menu",
+    "sidebarFooter": {
+      "collapseTitle": "Collapse menu",
+      "expandTitle": "Expand menu",
+      "label": "Collapse menu",
+      "currentCourseLabel": "Current course",
+      "progressLabel": "{{percent}}% complete",
+      "premiumUntil": "Premium until {{date}}",
+      "freeBadge": "Free account",
+      "settingsAria": "Settings",
+      "logoutAria": "Log out"
+    },
+    "header": {
+      "collapseTitle": "Collapse sidebar",
+      "expandTitle": "Expand sidebar"
+    },
+    "searchPlaceholder": "Search for a course...",
+    "themeLight": "Switch to light mode",
+    "themeDark": "Switch to dark mode",
+    "notificationsAria": "Notifications",
+    "notifTitle": "Notifications",
+    "notifEmpty": "No alerts",
+    "notifEmptyBody": "You're all caught up! No new notifications.",
+    "roleFallback": "Student",
+    "profileMenuLink1": "My courses & Progress",
+    "profileMenuLink2": "Settings",
+    "logout": "Sign out",
+    "logoutConfirm": {
+      "title": "Sign out?",
+      "message": "Do you really want to end your learning session?",
+      "confirmLabel": "Sign out"
+    },
+    "fallbackPage": {
+      "category": "Student Space",
+      "title": "Dashboard",
+      "subtitle": "Welcome to your learning space."
+    },
+    "nav": {
+      "apprentissage": "Learning",
+      "dashboard": "Dashboard",
+      "catalogue": "Course catalog",
+      "mesFormations": "My courses",
+      "coachIa": "AI Coach",
+      "messagerie": "Messaging",
+      "ressources": "Resources & News",
+      "actualites": "News",
+      "bibliotheque": "Library",
+      "outils": "Tools",
+      "abonnement": "Subscription"
+    },
+    "pageTitles": {
+      "dashboard": { "category": "Home", "title": "Dashboard", "subtitle": "Overall view of your journey and progress." },
+      "catalogue": { "category": "Catalog", "title": "Course catalog", "subtitle": "Explore and discover your next courses." },
+      "mesFormations": { "category": "My courses", "title": "My courses", "subtitle": "Track your progress and enrolled courses." },
+      "coachIa": { "category": "AI Coach", "title": "AI Coach", "subtitle": "Ask your AI tutor questions about the current lesson." },
+      "messagerie": { "category": "Messaging", "title": "Messaging", "subtitle": "Chat with the instructors of the courses you're enrolled in." },
+      "actualites": { "category": "News", "title": "News & Updates", "subtitle": "Discover newly shared courses and announcements." },
+      "bibliotheque": { "category": "Resources", "title": "Digital Library", "subtitle": "Search and browse learning materials by category." },
+      "outils": { "category": "Tools", "title": "Tools", "subtitle": "Practical tools to support your learning." },
+      "outilsIde": { "category": "Tools", "title": "Online IDE", "subtitle": "Write and run code directly in your browser." },
+      "outilsTableur": { "category": "Tools", "title": "Spreadsheet", "subtitle": "Create workbooks, practice formulas and calculations." },
+      "outilsNotes": { "category": "Tools", "title": "Note-taking", "subtitle": "Your personal notes, free-form or linked to a lesson." },
+      "outilsCalculatrice": { "category": "Tools", "title": "Scientific calculator", "subtitle": "Trigonometry, logarithms, powers, memory and history." },
+      "outilsTableauBlanc": { "category": "Tools", "title": "Whiteboard", "subtitle": "Draw your diagrams and mind maps, saved to your space." },
+      "outilsModelisation3d": { "category": "Tools", "title": "3D Modeling", "subtitle": "Assemble 3D shapes: move, rotate, color, save." },
+      "abonnement": { "category": "Account", "title": "Subscription", "subtitle": "Your status and the available plans." },
+      "parametres": { "category": "Account", "title": "Settings", "subtitle": "Manage your profile, password and preferences." }
+    }
+  },
+  "etablissementAdmin": {
+    "workspaceLabel": "Institution Space",
+    "breadcrumbRoot": "Institution",
+    "closeMenuAria": "Close menu",
+    "openMenuAria": "Open menu",
+    "roleFallback": "Institution admin",
+    "header": {
+      "collapseTitle": "Collapse sidebar",
+      "expandTitle": "Expand sidebar"
+    },
+    "sidebarFooter": {
+      "collapseTitle": "Collapse menu",
+      "expandTitle": "Expand menu",
+      "label": "Collapse menu"
+    },
+    "themeLight": "Switch to light mode",
+    "themeDark": "Switch to dark mode",
+    "profileMenuLink": "Settings",
+    "logout": "Sign out",
+    "logoutConfirm": {
+      "title": "Sign out?",
+      "message": "Do you really want to end your institution session?",
+      "confirmLabel": "Sign out"
+    },
+    "fallbackPage": {
+      "category": "Institution",
+      "title": "Dashboard",
+      "subtitle": "Overview of your institution."
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "apprenants": "Students",
+      "formateurs": "Instructors",
+      "classes": "Classes & Tracks"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Dashboard", "subtitle": "Subscription status and headcount for your institution." },
+      "apprenants": { "title": "Students", "subtitle": "Student accounts linked to your institution." },
+      "formateurs": { "title": "Instructors", "subtitle": "Instructor accounts linked to your institution." },
+      "classes": { "title": "Classes & Tracks", "subtitle": "Organize your students by class and by track." }
+    },
+    "dashboardPage": {
+      "codeLabel": "Invitation code",
+      "codeHint": "Share this code with your instructors and students so they can join your institution.",
+      "planLabel": "Plan",
+      "expiresLabel": "Expires on",
+      "noSubscription": "No active subscription — contact the platform.",
+      "membersLabel": "Total members",
+      "studentsCount": "Students",
+      "instructorsCount": "Instructors"
+    },
+    "membresPage": {
+      "empty": "No accounts yet.",
+      "emptyHint": "Share your invitation code from the dashboard.",
+      "table": {
+        "name": "Name",
+        "email": "Email",
+        "status": "Status",
+        "classe": "Class",
+        "since": "Member since",
+        "actions": "Actions"
+      },
+      "active": "Active",
+      "inactive": "Blocked",
+      "block": "Block",
+      "unblock": "Unblock",
+      "noClasse": "— No class —",
+      "filterAllClasses": "All classes",
+      "classeUpdated": "Class updated.",
+      "blockConfirm": {
+        "title": "Block this account?",
+        "message": "\"{{name}}\" won't be able to sign in until you unblock them.",
+        "confirmLabel": "Block"
+      },
+      "unblockConfirm": {
+        "title": "Unblock this account?",
+        "message": "\"{{name}}\" will be able to sign in again.",
+        "confirmLabel": "Unblock"
+      },
+      "blockSuccess": "Account blocked.",
+      "unblockSuccess": "Account unblocked.",
+      "error": "Something went wrong.",
+      "importButton": "Import students",
+      "importModal": {
+        "title": "Import students",
+        "intro": "A .csv or .xlsx file with two columns: Name and Email (Google account). All imported students are linked to the chosen class.",
+        "classeLabel": "Destination class",
+        "classePlaceholder": "Choose a class...",
+        "noClasses": "Create a class first in \"Classes & Tracks\".",
+        "fileLabel": "File (.csv or .xlsx)",
+        "submit": "Import",
+        "submitting": "Importing...",
+        "close": "Close",
+        "resultCreated": "{{count}} account created",
+        "resultCreated_other": "{{count}} accounts created",
+        "resultUpdated": "{{count}} account updated (class reassigned)",
+        "resultUpdated_other": "{{count}} accounts updated (class reassigned)",
+        "resultSkipped": "{{count}} row skipped",
+        "resultSkipped_other": "{{count}} rows skipped",
+        "skippedReasonsTitle": "Skipped rows details",
+        "error": "Something went wrong during the import."
+      }
+    },
+    "classesPage": {
+      "filieresHeading": "Tracks",
+      "newFiliere": "New track",
+      "classesHeading": "Classes",
+      "newClasse": "New class",
+      "noFilieres": "No tracks yet.",
+      "noClasses": "No classes yet.",
+      "classesCount": "{{count}} class",
+      "classesCount_other": "{{count}} classes",
+      "elevesCount": "{{count}} student",
+      "elevesCount_other": "{{count}} students",
+      "noFiliereOption": "No track",
+      "editFiliere": "Edit track",
+      "editClasse": "Edit class",
+      "nomLabel": "Name",
+      "filiereLabel": "Track (optional)",
+      "deleteFiliereConfirm": {
+        "title": "Delete this track?",
+        "message": "\"{{nom}}\" will be permanently deleted. This action is irreversible.",
+        "confirmLabel": "Delete"
+      },
+      "deleteClasseConfirm": {
+        "title": "Delete this class?",
+        "message": "\"{{nom}}\" will be permanently deleted. This action is irreversible.",
+        "confirmLabel": "Delete"
+      },
+      "filiereSaved": "Track saved.",
+      "filiereDeleted": "Track deleted.",
+      "classeSaved": "Class saved.",
+      "classeDeleted": "Class deleted.",
+      "error": "Something went wrong."
+    }
+  }
+}

@@ -1,8 +1,9 @@
 import { ArrowLeft, BookOpen, Loader2, NotebookPen, Plus, Save, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
-import type { Inscription, PaginatedResponse, PublicFormationDetail } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, type Inscription, type PaginatedResponse, type PublicFormationDetail } from '../../api/types'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
 
 interface NoteItem {
@@ -27,6 +28,8 @@ export function NotesPage() {
   const { showToast } = useToast()
 
   const [notes, setNotes] = useState<NoteItem[] | null>(null)
+  const [notesCount, setNotesCount] = useState(0)
+  const [notesPage, setNotesPage] = useState(1)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   // Note ouverte dans l'éditeur (undefined = vue liste, null = nouvelle note)
@@ -43,11 +46,12 @@ export function NotesPage() {
   const [leconId, setLeconId] = useState('')
 
   useEffect(() => {
-    refreshList()
     apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
       .then((data) => setInscriptions(data.results))
       .catch(() => setInscriptions([]))
   }, [])
+
+  useEffect(refreshList, [notesPage])
 
   useEffect(() => {
     if (!formationId) {
@@ -66,8 +70,11 @@ export function NotesPage() {
   }, [formationId])
 
   function refreshList() {
-    apiFetch<PaginatedResponse<NoteItem>>('/notes/')
-      .then((res) => setNotes(res.results))
+    apiFetch<PaginatedResponse<NoteItem>>(`/notes/?page=${notesPage}`)
+      .then((res) => {
+        setNotes(res.results)
+        setNotesCount(res.count)
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
@@ -245,7 +252,7 @@ export function NotesPage() {
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
           <NotebookPen size={18} className="text-sky-500" />
-          Mes notes ({notes.length})
+          Mes notes ({notesCount})
         </h2>
         <button
           onClick={() => openEditor(null)}
@@ -306,6 +313,10 @@ export function NotesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {notes.length > 0 && (
+        <Pagination count={notesCount} page={notesPage} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setNotesPage} />
       )}
     </div>
   )

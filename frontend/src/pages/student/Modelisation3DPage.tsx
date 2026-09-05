@@ -1,7 +1,9 @@
 import { ArrowLeft, Boxes, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
+import { DEFAULT_PAGE_SIZE } from '../../api/types'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
 import { useTheme } from '../../theme/ThemeContext'
 import type { SceneObject } from './Studio3D'
@@ -31,6 +33,8 @@ export function Modelisation3DPage() {
   const { showToast } = useToast()
 
   const [scenes, setScenes] = useState<SceneSummary[] | null>(null)
+  const [scenesCount, setScenesCount] = useState(0)
+  const [scenesPage, setScenesPage] = useState(1)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [openScene, setOpenScene] = useState<SceneDetail | null>(null)
@@ -40,13 +44,14 @@ export function Modelisation3DPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
 
-  useEffect(() => {
-    refreshList()
-  }, [])
+  useEffect(refreshList, [scenesPage])
 
   function refreshList() {
-    apiFetch<PaginatedResponse<SceneSummary>>('/scenes3d/')
-      .then((res) => setScenes(res.results))
+    apiFetch<PaginatedResponse<SceneSummary>>(`/scenes3d/?page=${scenesPage}`)
+      .then((res) => {
+        setScenes(res.results)
+        setScenesCount(res.count)
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
@@ -215,7 +220,7 @@ export function Modelisation3DPage() {
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
           <Boxes size={18} className="text-sky-500" />
-          Mes scènes 3D ({scenes.length})
+          Mes scènes 3D ({scenesCount})
         </h2>
         <button
           onClick={handleCreate}
@@ -263,6 +268,10 @@ export function Modelisation3DPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {scenes.length > 0 && (
+        <Pagination count={scenesCount} page={scenesPage} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setScenesPage} />
       )}
     </div>
   )

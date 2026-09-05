@@ -1,6 +1,8 @@
+from django.core.files.storage import default_storage
 from django.db.models import ProtectedError, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -58,6 +60,11 @@ class FormationListCreateView(generics.ListCreateAPIView):
         statut = self.request.query_params.get("statut")
         if statut:
             queryset = queryset.filter(statut=statut)
+        q = self.request.query_params.get("q")
+        if q:
+            queryset = queryset.filter(
+                Q(titre__icontains=q) | Q(categorie__nom__icontains=q) | Q(auteur__email__icontains=q)
+            )
         return queryset
 
     def perform_create(self, serializer):
@@ -117,8 +124,14 @@ class FormationSubmitView(_FormationTransitionView):
 
 
 class FormationValidateView(_FormationTransitionView):
-    """POST /api/formations/<id>/validate/ — SOUMISE -> VALIDEE (RG-002)."""
+    """POST /api/formations/<id>/validate/ — SOUMISE -> VALIDEE (RG-002).
 
+    Réservé à l'Administrateur (pas IsInstructorOrAdmin comme la classe de
+    base) : sans ça, un formateur pouvait valider sa propre soumission
+    (le contrôle hérité ne bloque qu'agir sur la formation d'un AUTRE
+    formateur, pas sur la sienne), ce qui viole RG-002."""
+
+    permission_classes = [IsAdmin]
     expected_status = Formation.Statut.SOUMISE
     next_status = Formation.Statut.VALIDEE
     action_label = "FORMATION_VALIDEE"
@@ -130,8 +143,10 @@ class FormationValidateView(_FormationTransitionView):
 
 
 class FormationRefuseView(_FormationTransitionView):
-    """POST /api/formations/<id>/refuse/ — SOUMISE -> REFUSEE, motif requis."""
+    """POST /api/formations/<id>/refuse/ — SOUMISE -> REFUSEE, motif requis.
+    Réservé à l'Administrateur, même raison que FormationValidateView."""
 
+    permission_classes = [IsAdmin]
     expected_status = Formation.Statut.SOUMISE
     next_status = Formation.Statut.REFUSEE
     action_label = "FORMATION_REFUSEE"
@@ -185,6 +200,30 @@ class FormationUnpublishView(_FormationTransitionView):
     expected_status = Formation.Statut.PUBLIEE
     next_status = Formation.Statut.DEPUBLIEE
     action_label = "FORMATION_DEPUBLIEE"
+
+
+class FormationAssignerView(APIView):
+    """POST /api/formations/<id>/assigner/ — l'administrateur attribue (ou
+    réattribue) une formation à un formateur, par exemple une formation
+    qu'il a lui-même créée et souhaite confier à quelqu'un. `auteur` étant
+    la seule notion de propriétaire dans tout le reste de l'app (visible
+    dans "Mes formations", vérifié par les vues de transition...), la
+    réassigner ici suffit à rendre la formation gérable par ce formateur.
+    Réservé à l'administrateur : jamais un formateur, qui pourrait sinon
+    se décharger de sa propre formation sur quelqu'un d'autre."""
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        formation = get_object_or_404(Formation, pk=pk)
+        formateur_id = request.data.get("formateur_id")
+        if not formateur_id:
+            return Response({"detail": "formateur_id est requis."}, status=status.HTTP_400_BAD_REQUEST)
+        formateur = get_object_or_404(User, pk=formateur_id, role=User.Role.INSTRUCTOR)
+        formation.auteur = formateur
+        formation.save(update_fields=["auteur"])
+        log_activity(request.user, "FORMATION_ASSIGNEE", f"{formation.titre} → {formateur.email}")
+        return Response(FormationSerializer(formation).data)
 
 
 # ============================================================
@@ -245,9 +284,75 @@ class LeconDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Lecon.objects.filter(module_id=self.kwargs["module_id"])
 
 
+class LeconVideoUploadView(APIView):
+    """POST /api/lecons/videos/upload/ — dépôt réel d'un fichier vidéo pour
+    une leçon (multipart, champ `fichier`), renvoie l'URL serveur réelle à
+    stocker dans Lecon.video_url. Remplace l'ancien URL.createObjectURL()
+    côté client : cette URL-là n'existe que dans l'onglet du navigateur qui
+    vient de choisir le fichier, jamais persistée ni transmise à personne
+    d'autre (ni à l'admin, ni à un apprenant, ni même à soi-même après un
+    rechargement de page) — d'où la vidéo introuvable/illisible."""
+
+    permission_classes = [IsInstructorOrAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    FORMATS_AUTORISES = (".mp4", ".webm", ".ogg", ".mov")
+    TAILLE_MAX_OCTETS = 300 * 1024 * 1024  # 300 Mo
+
+    def post(self, request):
+        fichier = request.FILES.get("fichier")
+        if not fichier:
+            return Response({"detail": "Aucun fichier fourni."}, status=status.HTTP_400_BAD_REQUEST)
+
+        nom = (fichier.name or "").lower()
+        if not nom.endswith(self.FORMATS_AUTORISES):
+            return Response(
+                {"detail": "Format vidéo non supporté (mp4, webm, ogg, mov)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if fichier.size > self.TAILLE_MAX_OCTETS:
+            return Response({"detail": "Fichier trop volumineux (300 Mo maximum)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chemin = default_storage.save(f"videos-lecons/{fichier.name}", fichier)
+        video_url = request.build_absolute_uri(default_storage.url(chemin))
+        return Response({"video_url": video_url}, status=status.HTTP_201_CREATED)
+
+
 # ============================================================
 # Ressources — imbriquées sous une leçon (RF-010)
 # ============================================================
+
+
+class RessourceUploadView(APIView):
+    """POST /api/lecons/ressources/upload/ — dépôt réel d'un support de
+    leçon (PDF/Office/image), même principe que LeconVideoUploadView : la
+    Ressource elle-même (RF-010) ne stocke qu'une URL, jamais l'upload —
+    cette vue lui fournit une URL réelle plutôt qu'une URL locale au
+    navigateur qui ne survivrait pas à un rechargement de page."""
+
+    permission_classes = [IsInstructorOrAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    FORMATS_AUTORISES = (".pdf", ".doc", ".docx", ".ppt", ".pptx", ".png", ".jpg", ".jpeg")
+    TAILLE_MAX_OCTETS = 50 * 1024 * 1024  # 50 Mo
+
+    def post(self, request):
+        fichier = request.FILES.get("fichier")
+        if not fichier:
+            return Response({"detail": "Aucun fichier fourni."}, status=status.HTTP_400_BAD_REQUEST)
+
+        nom = (fichier.name or "").lower()
+        if not nom.endswith(self.FORMATS_AUTORISES):
+            return Response(
+                {"detail": "Format non supporté (pdf, doc, docx, ppt, pptx, png, jpg)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if fichier.size > self.TAILLE_MAX_OCTETS:
+            return Response({"detail": "Fichier trop volumineux (50 Mo maximum)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chemin = default_storage.save(f"ressources-lecons/{fichier.name}", fichier)
+        url = request.build_absolute_uri(default_storage.url(chemin))
+        return Response({"url": url}, status=status.HTTP_201_CREATED)
 
 
 class RessourceListCreateView(generics.ListCreateAPIView):

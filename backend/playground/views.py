@@ -5,6 +5,8 @@ import urllib.request
 from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+
+from billing.permissions import HasActiveSubscription
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -34,7 +36,7 @@ LANGUAGES = {
 class PlaygroundLanguagesView(APIView):
     """GET /api/playground/languages/ — langages disponibles dans l'IDE."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get(self, request):
         return Response([{"id": key, "label": meta["label"]} for key, meta in LANGUAGES.items()])
@@ -45,7 +47,7 @@ class PlaygroundRunView(APIView):
     JDoodle. Aucune simulation : le code est vraiment compilé/exécuté par
     le service, la sortie est renvoyée telle quelle."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def post(self, request):
         serializer = RunCodeSerializer(data=request.data)

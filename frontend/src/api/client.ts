@@ -9,6 +9,15 @@ export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_KEY)
 }
 
+/** Construit une URL ws(s):// vers le même serveur que l'API REST — même
+ * host/port, même bascule http->ws / https->wss, mais sans le suffixe
+ * `/api` (les routes WebSocket vivent à la racine, sous `/ws/`). */
+export function getWebSocketUrl(path: string): string {
+  const apiUrl = new URL(API_BASE_URL)
+  const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${wsProtocol}//${apiUrl.host}${path}`
+}
+
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_KEY)
 }
@@ -92,16 +101,20 @@ interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
  * un refresh si le token a expiré (401), et parse le JSON. */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { skipAuth, headers, body, ...rest } = options
+  // Upload de fichier (FormData) : ne JAMAIS fixer Content-Type nous-mêmes —
+  // le navigateur doit y ajouter la "boundary" multipart lui-même. Tout le
+  // reste (JSON) garde le comportement existant, inchangé.
+  const isFormData = body instanceof FormData
 
   const doFetch = (accessToken: string | null) =>
     fetch(`${API_BASE_URL}${path}`, {
       ...rest,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isFormData ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
     })
 
   let response = await doFetch(skipAuth ? null : getAccessToken())

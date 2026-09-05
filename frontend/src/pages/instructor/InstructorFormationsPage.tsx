@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import {
+  DEFAULT_PAGE_SIZE,
   NIVEAU_LABELS,
   STATUT_BADGE_STYLES,
   STATUT_LABELS,
@@ -23,9 +24,10 @@ import {
   type PaginatedResponse,
 } from '../../api/types'
 import { Alert } from '../../components/Alert'
-import { useAuth } from '../../auth/AuthContext'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 interface ModuleItem {
   id: string
@@ -34,29 +36,41 @@ interface ModuleItem {
 }
 
 export function InstructorFormationsPage() {
-  const { user } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
 
   const [formations, setFormations] = useState<Formation[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatut, setSelectedStatut] = useState<string>('TOUS')
 
   // Modale de gestion des modules & leçons par le formateur
   const [selectedFormationForModules, setSelectedFormationForModules] = useState<Formation | null>(null)
+  const [selectedFormationForPreview, setSelectedFormationForPreview] = useState<Formation | null>(null)
   const [modulesList, setModulesList] = useState<ModuleItem[]>([])
   const [newModuleTitle, setNewModuleTitle] = useState('')
 
   function loadFormations() {
-    apiFetch<PaginatedResponse<Formation>>('/formations/')
-      .then((data) => setFormations(data.results))
+    const params = new URLSearchParams()
+    if (selectedStatut !== 'TOUS') params.set('statut', selectedStatut)
+    if (searchQuery.trim()) params.set('q', searchQuery.trim())
+    params.set('page', String(page))
+    apiFetch<PaginatedResponse<Formation>>(`/formations/?${params.toString()}`)
+      .then((data) => {
+        setFormations(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des cours.'))
   }
 
   useEffect(() => {
-    loadFormations()
-  }, [])
+    const timeout = setTimeout(loadFormations, 250)
+    return () => clearTimeout(timeout)
+  }, [selectedStatut, searchQuery, page])
+  useEffect(() => setPage(1), [selectedStatut, searchQuery])
+  useRealtimeTopics(['instructor_formations'], loadFormations)
 
   // Action : Soumettre la formation pour vérification et validation par l'admin
   async function handleSubmitForValidation(formation: Formation) {
@@ -106,18 +120,6 @@ export function InstructorFormationsPage() {
       </div>
     )
   }
-
-  const filtered = formations.filter((f) => {
-    // Un formateur ne voit strictement que les formations qu'il a créées
-    if (user?.role === 'INSTRUCTOR' && f.auteur !== user.id && f.auteur_email !== user.email) {
-      return false
-    }
-    const matchesSearch =
-      f.titre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.categorie_nom.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatut = selectedStatut === 'TOUS' || f.statut === selectedStatut
-    return matchesSearch && matchesStatut
-  })
 
   return (
     <div className="space-y-6">
@@ -195,7 +197,7 @@ export function InstructorFormationsPage() {
       </div>
 
       {/* LISTE ET CARTE DES FORMATIONS */}
-      {filtered.length === 0 ? (
+      {formations.length === 0 ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
           <BookOpen size={32} className="mx-auto text-slate-300 dark:text-slate-600" />
           <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-slate-100">Aucune formation trouvée</h3>
@@ -203,7 +205,7 @@ export function InstructorFormationsPage() {
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((f) => (
+          {formations.map((f) => (
             <div
               key={f.id}
               className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-md backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-indigo-400 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-indigo-500/40"
@@ -282,14 +284,22 @@ export function InstructorFormationsPage() {
                     Gérer modules
                   </button>
 
-                  <Link
-                    to={`/apprenant/formations/${f.id}`}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFormationForPreview(f)}
                     className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200"
                   >
                     <Eye size={14} />
-                    Vue élève
-                  </Link>
+                    Aperçu
+                  </button>
                 </div>
+
+                <Link
+                  to={`/formateur/creer-formation/${f.id}`}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2.5 text-[11px] font-extrabold text-white shadow-md hover:from-indigo-700 hover:to-sky-700 active:scale-95"
+                >
+                  Modifier la formation
+                </Link>
 
                 {/* BOUTON SOUMETTRE À L'ADMIN (RÉSERVÉ SI BROUILLON OU REFUSÉE) */}
                 {(f.statut === 'BROUILLON' || f.statut === 'REFUSEE') && (
@@ -304,6 +314,97 @@ export function InstructorFormationsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {formations.length > 0 && (
+        <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
+      )}
+
+      {selectedFormationForPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-[fade-in_0.2s_ease-out]">
+          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+                  Aperçu formateur
+                </p>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  {selectedFormationForPreview.titre}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFormationForPreview(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex items-center rounded-xl bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                    {selectedFormationForPreview.categorie_nom}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUT_BADGE_STYLES[selectedFormationForPreview.statut]}`}>
+                    {STATUT_LABELS[selectedFormationForPreview.statut]}
+                  </span>
+                </div>
+
+                <p className="mt-4 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {selectedFormationForPreview.description || 'Aucune description disponible.'}
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Niveau</span>
+                    {NIVEAU_LABELS[selectedFormationForPreview.niveau]}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Durée</span>
+                    {selectedFormationForPreview.duree_heures} h
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Département</span>
+                    {selectedFormationForPreview.departement_nom || 'Non renseigné'}
+                  </div>
+                </div>
+              </div>
+
+              {(selectedFormationForPreview.modules?.length ?? 0) > 0 ? (
+                <div className="space-y-4">
+                  {selectedFormationForPreview.modules?.map((module, index) => (
+                    <div key={module.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                      <h4 className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                        Module {index + 1} : {module.titre}
+                      </h4>
+                      {module.description && (
+                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{module.description}</p>
+                      )}
+
+                      {module.lecons?.length ? (
+                        <ul className="mt-3 space-y-2 pl-4 text-[11px] text-slate-600 dark:text-slate-300">
+                          {module.lecons.map((lecon) => (
+                            <li key={lecon.id} className="list-disc">
+                              {lecon.titre}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-3 text-[11px] text-slate-400">Aucune leçon renseignée dans ce module.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  Aucun module détaillé n’est disponible pour cet aperçu.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

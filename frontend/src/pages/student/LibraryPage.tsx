@@ -1,716 +1,519 @@
 import {
-  Library,
-  Search,
   BookOpen,
-  FileText,
-  Download,
-  Eye,
-  Filter,
-  Tag,
-  Clock,
-  X,
   CheckCircle2,
-  Bookmark,
+  Clock,
+  Download,
+  FileText,
+  Filter,
+  Library,
   Plus,
+  Search,
+  Send,
+  Trash2,
   UploadCloud,
-  Sparkles,
-  FileCheck,
-  User,
-  ShieldCheck,
-  Check,
-  XCircle,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
+import { apiFetch, ApiError } from '../../api/client'
+import {
+  DOCUMENT_STATUT_BADGE_STYLES,
+  DOCUMENT_STATUT_LABELS,
+  type Category,
+  type LibraryDocument,
+  type PaginatedResponse,
+} from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
+import { Alert } from '../../components/Alert'
+import { useConfirm } from '../../components/ConfirmContext'
+import { Modal } from '../../components/Modal'
+import { Pagination } from '../../components/Pagination'
+import { useToast } from '../../components/ToastContext'
 
-interface DocumentItem {
-  id: string
-  title: string
-  category: string
-  format: 'PDF' | 'EPUB' | 'FICHE' | 'GUIDE'
-  pages: number
-  readTime: string
-  fileSize: string
-  description: string
-  contentPreview: string
-  author: string
-  rating: number
-  coverTheme: 'sky' | 'indigo' | 'emerald' | 'amber' | 'rose' | 'dark'
-  createdAt: string
-  uploadedByRole?: 'ADMIN' | 'INSTRUCTOR' | 'STUDENT'
-  status: 'SOUMISE' | 'PUBLIEE' | 'REFUSEE'
-}
+// pdf.js pèse lourd : chargé uniquement quand une carte doit réellement
+// afficher un aperçu PDF, pas au démarrage de l'application.
+const PdfThumbnail = lazy(() =>
+  import('../../components/PdfThumbnail').then((module) => ({ default: module.PdfThumbnail })),
+)
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
-const CATEGORIES = [
-  'Toutes les catégories',
-  'Intelligence Artificielle',
-  'Développement Web',
-  'Data Science',
-  'Cybersécurité',
-  'UX/UI Design',
-  'Management & Agilité',
-]
+const PAGE_SIZE = 7
 
-const COVER_GRADIENTS: Record<DocumentItem['coverTheme'], string> = {
-  sky: 'from-sky-600 via-sky-700 to-slate-900 text-white',
-  indigo: 'from-indigo-600 via-indigo-800 to-slate-950 text-white',
-  emerald: 'from-emerald-600 via-teal-800 to-slate-900 text-white',
-  amber: 'from-amber-500 via-orange-600 to-slate-900 text-white',
-  rose: 'from-rose-600 via-rose-800 to-slate-950 text-white',
-  dark: 'from-slate-800 via-slate-900 to-black text-slate-100',
+function formatTaille(octets: number) {
+  if (octets < 1024) return `${octets} o`
+  if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(0)} Ko`
+  return `${(octets / (1024 * 1024)).toFixed(1)} Mo`
 }
 
 export function LibraryPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'ADMIN'
-  const isInstructor = user?.role === 'INSTRUCTOR'
-  const canUpload = isAdmin || isInstructor
+  const confirm = useConfirm()
+  const { showToast } = useToast()
+  const canUpload = user?.role === 'ADMIN' || user?.role === 'INSTRUCTOR'
 
-  const [documents, setDocuments] = useState<DocumentItem[]>(() => {
-    const saved = localStorage.getItem('ai_learning_library_docs')
-    if (saved) {
-      try {
-        const parsed: DocumentItem[] = JSON.parse(saved)
-        const cleaned = parsed.filter((d) => !['doc-1', 'doc-2', 'doc-3', 'doc-4', 'doc-5'].includes(d.id))
-        localStorage.setItem('ai_learning_library_docs', JSON.stringify(cleaned))
-        return cleaned
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  // ---- Bibliothèque publiée (consultable par tous) ----
+  const [documents, setDocuments] = useState<LibraryDocument[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [categorieFilter, setCategorieFilter] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('Toutes les catégories')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SOUMISE' | 'PUBLIEE'>('ALL')
-  const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null)
-  const [bookmarkedDocs, setBookmarkedDocs] = useState<string[]>([])
-  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null)
+  function loadDocuments() {
+    const params = new URLSearchParams()
+    if (search.trim()) params.set('q', search.trim())
+    if (categorieFilter) params.set('categorie', categorieFilter)
+    params.set('page', String(page))
+    apiFetch<PaginatedResponse<LibraryDocument>>(`/bibliotheque/documents/?${params.toString()}`)
+      .then((data) => {
+        setDocuments(data.results)
+        setCount(data.count)
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
+  }
 
-  // ÉTAT DU FORMULAIRE D'UPLOAD / DE DÉPÔT DE DOCUMENT
-  const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newCategory, setNewCategory] = useState('Intelligence Artificielle')
-  const [newFormat, setNewFormat] = useState<'PDF' | 'EPUB' | 'FICHE' | 'GUIDE'>('PDF')
-  const [newCoverTheme, setNewCoverTheme] = useState<DocumentItem['coverTheme']>('sky')
-  const [newDescription, setNewDescription] = useState('')
-  const [newPreview, setNewPreview] = useState('')
-  const [newPages, setNewPages] = useState(24)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null)
-
-  // Persistance dans localStorage
   useEffect(() => {
-    localStorage.setItem('ai_learning_library_docs', JSON.stringify(documents))
-  }, [documents])
+    const timeout = setTimeout(loadDocuments, 250)
+    return () => clearTimeout(timeout)
+  }, [search, categorieFilter, page])
+  useEffect(() => setPage(1), [search, categorieFilter])
+  useRealtimeTopics(['bibliotheque'], loadDocuments)
 
-  // Filtrage dynamique des documents selon les droits du rôle connecté
-  const visibleDocs = documents.filter((doc) => {
-    // Les élèves ne voient QUE les documents publiés
-    if (!isAdmin && !isInstructor && doc.status !== 'PUBLIEE') return false
+  useEffect(() => {
+    apiFetch<PaginatedResponse<Category>>('/categories/')
+      .then((data) => setCategories(data.results))
+      .catch(() => setCategories([]))
+  }, [])
 
-    // Les formateurs voient les publiés + leurs propres soumis
-    if (isInstructor && doc.status !== 'PUBLIEE' && doc.author !== (user?.email || 'Formateur')) {
-      // Autoriser la consultation globale
-    }
+  // ---- Mes dépôts (formateur/admin uniquement) ----
+  const [mesDocuments, setMesDocuments] = useState<LibraryDocument[] | null>(null)
 
-    if (statusFilter === 'SOUMISE' && doc.status !== 'SOUMISE') return false
-    if (statusFilter === 'PUBLIEE' && doc.status !== 'PUBLIEE') return false
-
-    const matchesCategory = selectedCategory === 'Toutes les catégories' || doc.category === selectedCategory
-    const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.author.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
-
-  const pendingCount = documents.filter((d) => d.status === 'SOUMISE').length
-
-  function toggleBookmark(docId: string) {
-    setBookmarkedDocs((prev) =>
-      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
-    )
+  function loadMesDocuments() {
+    if (!canUpload) return
+    apiFetch<PaginatedResponse<LibraryDocument>>('/documents/')
+      .then((data) => setMesDocuments(data.results))
+      .catch(() => setMesDocuments([]))
   }
 
-  function handleDownload(doc: DocumentItem) {
-    setDownloadSuccess(`Le document "${doc.title}" a été téléchargé avec succès.`)
-    setTimeout(() => setDownloadSuccess(null), 3500)
-  }
+  useEffect(loadMesDocuments, [canUpload])
+  useRealtimeTopics(canUpload ? ['instructor_documents'] : [], loadMesDocuments)
 
-  function handleValidateDocument(docId: string) {
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === docId ? { ...d, status: 'PUBLIEE' as const } : d))
-    )
-    setUploadSuccessMsg('Document vérifié et publié avec succès dans la bibliothèque.')
-    setTimeout(() => setUploadSuccessMsg(null), 4000)
-  }
+  // ---- Dépôt d'un nouveau document ----
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [newTitre, setNewTitre] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newCategorie, setNewCategorie] = useState('')
+  const [newFormat, setNewFormat] = useState<'PDF' | 'EPUB'>('PDF')
+  const [newFile, setNewFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  // Le titre se pré-remplit avec le nom du fichier choisi, mais ne doit
+  // plus être écrasé une fois que l'utilisateur y a touché lui-même.
+  const [titreTouche, setTitreTouche] = useState(false)
 
-  function handleRefuseDocument(docId: string) {
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === docId ? { ...d, status: 'REFUSEE' as const } : d))
-    )
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setSelectedFile(file)
-      if (!newTitle) {
-        setNewTitle(file.name.replace(/\.[^/.]+$/, ''))
-      }
-    }
-  }
-
-  function handleAddDocument(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newTitle.trim()) return
-
-    const authorName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email : 'Formateur AI Learning'
-
-    // Si l'utilisateur est ADMIN, la publication est directe. Si FORMATEUR, il est SOUMISE pour validation admin !
-    const initialStatus: DocumentItem['status'] = isAdmin ? 'PUBLIEE' : 'SOUMISE'
-
-    const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}`,
-      title: newTitle,
-      category: newCategory,
-      format: newFormat,
-      pages: Number(newPages) || 15,
-      readTime: `${Math.max(5, Math.round(Number(newPages) * 0.7))} min`,
-      fileSize: selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB',
-      description: newDescription || 'Document pédagogique partagé par l’équipe d’enseignement.',
-      contentPreview: newPreview || `Document officiel : ${newTitle}\n\nAuteur : ${authorName}\nCatégorie : ${newCategory}\n\nConsultez le fichier complet téléchargé pour accéder à l’intégralité des modules et exercices.`,
-      author: authorName,
-      rating: 5.0,
-      coverTheme: newCoverTheme,
-      createdAt: new Date().toISOString().split('T')[0],
-      uploadedByRole: (user?.role as 'ADMIN' | 'INSTRUCTOR') || 'INSTRUCTOR',
-      status: initialStatus,
-    }
-
-    setDocuments([newDoc, ...documents])
-    setIsUploadOpen(false)
-
-    if (isAdmin) {
-      setUploadSuccessMsg(`Le document "${newTitle}" a été publié directement dans la bibliothèque.`)
-    } else {
-      setUploadSuccessMsg(`Le document "${newTitle}" a été soumis pour vérification à l'administrateur. Il apparaîtra dans la bibliothèque après validation.`)
-    }
-
-    // Réinitialisation form
-    setNewTitle('')
+  function openUploadModal() {
+    setNewTitre('')
     setNewDescription('')
-    setNewPreview('')
-    setSelectedFile(null)
+    setNewCategorie(categories[0]?.id ?? '')
+    setNewFormat('PDF')
+    setNewFile(null)
+    setTitreTouche(false)
+    setUploadError(null)
+    setIsUploadOpen(true)
+  }
 
-    setTimeout(() => setUploadSuccessMsg(null), 5000)
+  function handleFileChange(file: File | null) {
+    setNewFile(file)
+    if (file && !titreTouche) {
+      const sansExtension = file.name.replace(/\.[^./]+$/, '')
+      setNewTitre(sansExtension.replace(/[_-]+/g, ' ').trim())
+    }
+  }
+
+  async function handleUpload(event: FormEvent) {
+    event.preventDefault()
+    if (!newFile || !newCategorie || !newTitre.trim()) return
+    setIsUploading(true)
+    setUploadError(null)
+    try {
+      const formData = new FormData()
+      formData.append('titre', newTitre.trim())
+      formData.append('description', newDescription.trim())
+      formData.append('categorie', newCategorie)
+      formData.append('format', newFormat)
+      formData.append('fichier', newFile)
+      await apiFetch('/documents/', { method: 'POST', body: formData })
+      showToast('success', "Document déposé. Pensez à le soumettre pour qu'un administrateur le valide.")
+      setIsUploadOpen(false)
+      loadMesDocuments()
+    } catch (err) {
+      setUploadError(err instanceof ApiError ? err.message : 'Impossible de déposer ce document.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  async function handleSubmitForReview(document: LibraryDocument) {
+    try {
+      await apiFetch(`/documents/${document.id}/submit/`, { method: 'POST' })
+      showToast('success', "Document soumis pour validation à l'administrateur.")
+      loadMesDocuments()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de soumettre ce document.')
+    }
+  }
+
+  async function handleUnpublish(document: LibraryDocument) {
+    try {
+      await apiFetch(`/documents/${document.id}/unpublish/`, { method: 'POST' })
+      showToast('success', 'Document dépublié.')
+      loadMesDocuments()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de dépublier ce document.')
+    }
+  }
+
+  async function handleDeleteDocument(document: LibraryDocument) {
+    const ok = await confirm({
+      title: 'Supprimer ce document ?',
+      message: `"${document.titre}" sera définitivement supprimé. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await apiFetch(`/documents/${document.id}/`, { method: 'DELETE' })
+      showToast('success', 'Document supprimé.')
+      loadMesDocuments()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de supprimer ce document.')
+    }
   }
 
   return (
     <div className="space-y-8">
-      {/* BANNIÈRE DE LA BIBLIOTHÈQUE NUMÉRIQUE */}
-      <div className="relative overflow-hidden rounded-3xl border border-sky-200/50 bg-gradient-to-br from-slate-900 via-sky-900 to-indigo-900 p-6 text-white shadow-xl shadow-sky-500/10 sm:p-8 dark:border-sky-500/20">
-        <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-
+      {/* BANNIÈRE */}
+      <div className="relative overflow-hidden rounded-3xl border border-sky-200/50 bg-gradient-to-br from-indigo-900 via-sky-800 to-slate-900 p-6 text-white shadow-xl shadow-sky-500/10 sm:p-8 dark:border-sky-500/20">
+        <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-sky-400/15 blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-center">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-sky-100 backdrop-blur-md">
-              <Library size={14} className="text-sky-300" />
-              <span>Bibliothèque Numérique D'Apprentissage</span>
+              <Library size={14} className="text-amber-300" />
+              <span>Bibliothèque & Supports</span>
             </div>
-
             <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Ressources & Documents à lire
+              Documents PDF/EPUB de la plateforme
             </h1>
             <p className="mt-2 text-xs leading-relaxed text-sky-100/90 sm:text-sm">
-              Accédez à une sélection de manuels, guides pratiques et fiches de synthèse avec page de garde interactive, vérifiés et validés par la direction pédagogique.
+              Consultez les supports validés et publiés par l'administration.
             </p>
           </div>
-
           {canUpload && (
-            <div className="shrink-0">
-              <button
-                onClick={() => setIsUploadOpen(true)}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-sky-500 px-5 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-sky-500/30 transition-all hover:from-sky-500 hover:to-sky-600 active:scale-95"
-              >
-                <Plus size={16} />
-                <span>Uploader un document</span>
-              </button>
-            </div>
+            <button
+              onClick={openUploadModal}
+              className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-extrabold text-slate-900 shadow-lg transition-all hover:bg-sky-50 active:scale-95"
+            >
+              <UploadCloud size={16} />
+              Déposer un document
+            </button>
           )}
         </div>
       </div>
 
-      {/* RAPPEL SUR LES DOCUMENTS EN ATTENTE DE VALIDATION POUR L'ADMIN */}
-      {isAdmin && pendingCount > 0 && (
-        <div className="flex items-center justify-between gap-4 rounded-3xl border border-amber-300 bg-amber-50 p-4 text-xs font-bold text-amber-900 shadow-md dark:border-amber-800/80 dark:bg-amber-950/60 dark:text-amber-200">
-          <div className="flex items-center gap-3">
-            <ShieldCheck size={22} className="text-amber-500 shrink-0" />
-            <span>Vous avez {pendingCount} document(s) soumis par les formateurs en attente de vérification.</span>
-          </div>
-          <button
-            onClick={() => setStatusFilter(statusFilter === 'SOUMISE' ? 'ALL' : 'SOUMISE')}
-            className="shrink-0 rounded-2xl bg-amber-600 px-4 py-2 text-xs text-white hover:bg-amber-700 shadow-sm"
-          >
-            {statusFilter === 'SOUMISE' ? 'Voir tous' : `Examiner (${pendingCount}) →`}
-          </button>
-        </div>
-      )}
-
-      {/* ALERTE SUCCÈS PUBLICATION / MODÉRATION */}
-      {uploadSuccessMsg && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-xs font-bold text-emerald-900 shadow-md dark:border-emerald-800/80 dark:bg-emerald-950/60 dark:text-emerald-200">
-          <FileCheck size={20} className="text-emerald-500 shrink-0" />
-          <span>{uploadSuccessMsg}</span>
-        </div>
-      )}
-
-      {/* ALERTE TÉLÉCHARGEMENT SUCCÈS */}
-      {downloadSuccess && (
-        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
-          <span>{downloadSuccess}</span>
-        </div>
-      )}
-
-      {/* RECHERCHE ET FILTRES PAR CATÉGORIE */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* RECHERCHE ET FILTRE CATÉGORIE */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher un document, auteur, mot-clé..."
-            className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-10 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Rechercher un document..."
+            className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <Filter size={16} className="text-slate-400 shrink-0 hidden sm:block" />
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`rounded-2xl px-3.5 py-2 text-xs font-bold transition-all shrink-0 ${selectedCategory === cat
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-500/20'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
-                }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="relative">
+          <Filter size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <select
+            value={categorieFilter}
+            onChange={(event) => setCategorieFilter(event.target.value)}
+            className="rounded-2xl border border-slate-200 bg-white py-2.5 pl-9 pr-8 text-xs font-medium text-slate-900 shadow-sm focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <option value="">Toutes les catégories</option>
+            {categories.map((categorie) => (
+              <option key={categorie.id} value={categorie.id}>
+                {categorie.nom}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* GRILLE DE DOCUMENTS AVEC APERÇU PAGE DE GARDE */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <BookOpen size={18} className="text-sky-500" />
-            Documents répertoriés ({visibleDocs.length})
-          </h2>
-        </div>
+      {error && <Alert variant="error" message={error} />}
 
-        {visibleDocs.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-            <FileText size={32} className="mx-auto text-slate-300 dark:text-slate-600" />
-            <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-slate-100">Aucun document disponible</h3>
-            <p className="mt-1 text-xs text-slate-400">Aucun document ne correspond à vos critères de recherche.</p>
-          </div>
-        ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleDocs.map((doc) => {
-              const isBookmarked = bookmarkedDocs.includes(doc.id)
-
-              return (
-                <div
-                  key={doc.id}
-                  className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-md shadow-slate-500/5 backdrop-blur-md transition-all duration-300 hover:-translate-y-1.5 hover:border-sky-300 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500/30"
-                >
-                  {/* APERÇU PAGE DE GARDE DÉDIÉE */}
-                  <div
-                    onClick={() => setSelectedDoc(doc)}
-                    className={`relative cursor-pointer overflow-hidden bg-gradient-to-br ${COVER_GRADIENTS[doc.coverTheme]
-                      } p-5 transition-transform group-hover:scale-[1.02] border-b border-white/10`}
-                  >
-                    {/* Tranche 3D */}
-                    <div className="absolute left-0 top-0 bottom-0 w-3 bg-black/20 border-r border-white/20 shadow-inner" />
-
-                    <div className="pl-3">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[9px] font-black tracking-wider uppercase text-white backdrop-blur-md">
-                          {doc.format} • {doc.pages} Pages
-                        </span>
-                        <span className="text-[10px] font-bold text-sky-200 opacity-90">
-                          {doc.category}
-                        </span>
-                      </div>
-
-                      {/* TITRE ET AUTEUR DE LA PAGE DE GARDE */}
-                      <div className="my-5 min-h-[4.5rem]">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-sky-200/80">
-                          Ouvrage Pédagogique
-                        </p>
-                        <h4 className="text-sm font-black leading-snug tracking-tight text-white line-clamp-2 mt-0.5">
-                          {doc.title}
-                        </h4>
-                      </div>
-
-                      {/* PIED DE GARDE */}
-                      <div className="flex items-center justify-between border-t border-white/15 pt-2.5 text-[10px] font-semibold text-white/90">
-                        <span className="flex items-center gap-1">
-                          <User size={12} className="text-sky-300" />
-                          {doc.author}
-                        </span>
-                        <span className="rounded bg-black/30 px-1.5 py-0.5 text-[9px] font-bold">
-                          AI LEARNING
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CORPS DE CARTE & STATUTS */}
-                  <div className="p-5 flex flex-col justify-between flex-1">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 dark:text-sky-400">
-                          <Tag size={12} />
-                          {doc.category}
-                        </span>
-
-                        {doc.status === 'SOUMISE' && (
-                          <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900">
-                            ⏳ En vérification
-                          </span>
-                        )}
-
-                        {doc.status === 'PUBLIEE' && (
-                          <button
-                            onClick={() => toggleBookmark(doc.id)}
-                            className={`rounded-xl p-1.5 transition-colors ${isBookmarked
-                                ? 'bg-amber-50 text-amber-500 dark:bg-amber-500/10'
-                                : 'text-slate-300 hover:text-amber-500 dark:text-slate-600'
-                              }`}
-                          >
-                            <Bookmark size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
-                          </button>
-                        )}
-                      </div>
-
-                      <p className="text-xs leading-relaxed text-slate-500 line-clamp-2 dark:text-slate-400">
-                        {doc.description}
-                      </p>
-                    </div>
-
-                    {/* METADATA & ACTIONS DE MODÉRATION / LECTURE */}
-                    <div className="mt-5 border-t border-slate-100 pt-3 dark:border-slate-800 space-y-3">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} /> {doc.readTime}
-                        </span>
-                        <span className="text-slate-600 dark:text-slate-300 font-bold">
-                          {doc.fileSize}
-                        </span>
-                      </div>
-
-                      {isAdmin && doc.status === 'SOUMISE' ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => handleValidateDocument(doc.id)}
-                            className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95"
-                          >
-                            <Check size={14} />
-                            Valider & Publier
-                          </button>
-                          <button
-                            onClick={() => handleRefuseDocument(doc.id)}
-                            className="flex items-center justify-center gap-1.5 rounded-2xl bg-rose-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-rose-700 active:scale-95"
-                          >
-                            <XCircle size={14} />
-                            Refuser
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => setSelectedDoc(doc)}
-                            className="flex items-center justify-center gap-1.5 rounded-2xl bg-sky-600 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-sky-700 active:scale-95"
-                          >
-                            <Eye size={14} />
-                            Aperçu / Lire
-                          </button>
-
-                          <button
-                            onClick={() => handleDownload(doc)}
-                            className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-slate-100 active:scale-95 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200"
-                          >
-                            <Download size={14} />
-                            Télécharger
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* MODALE D'UPLOAD PAR L'ENSEIGNANT OU L'ADMIN */}
-      {isUploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-[fade-in_0.2s_ease-out]">
-          <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            {/* EN-TÊTE MODALE */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-md shadow-sky-500/20">
-                  <UploadCloud size={20} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                    Ajouter / Uploader un document
-                  </h3>
-                  <p className="text-[11px] font-semibold text-slate-400">
-                    {isAdmin ? 'Publication immédiate' : 'Soumission obligatoire pour vérification Admin'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsUploadOpen(false)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* FORMULAIRE */}
-            <form onSubmit={handleAddDocument} className="flex-1 overflow-y-auto p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Fichier du document (PDF, EPUB) *
-                </label>
-                <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/50 p-5 text-center hover:bg-sky-50 transition-colors dark:border-sky-800/80 dark:bg-sky-950/20">
-                  <UploadCloud size={28} className="text-sky-500 mb-1" />
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {selectedFile ? selectedFile.name : 'Glissez votre fichier ici ou cliquez pour parcourir'}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, EPUB jusqu'à 50 Mo</p>
-                  <input
-                    type="file"
-                    accept=".pdf,.epub,.doc,.docx"
-                    onChange={handleFileChange}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Titre du document *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="ex: Guide des meilleures pratiques de SecOps..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Catégorie
-                  </label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-900 focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {CATEGORIES.filter((c) => c !== 'Toutes les catégories').map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Format
-                  </label>
-                  <select
-                    value={newFormat}
-                    onChange={(e) => setNewFormat(e.target.value as any)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-900 focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    <option value="PDF">PDF</option>
-                    <option value="EPUB">EPUB</option>
-                    <option value="FICHE">FICHE SYNTHÈSE</option>
-                    <option value="GUIDE">GUIDE PRATIQUE</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Thème visuel de la Page de Garde
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {(['sky', 'indigo', 'emerald', 'amber', 'rose', 'dark'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setNewCoverTheme(t)}
-                      className={`h-9 rounded-xl border-2 transition-all ${newCoverTheme === t ? 'border-sky-500 scale-105 shadow-md' : 'border-transparent'
-                        } bg-gradient-to-br ${COVER_GRADIENTS[t]}`}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Nombre de pages
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={newPages}
-                  onChange={(e) => setNewPages(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-900 focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Description succincte
-                </label>
-                <textarea
-                  rows={2}
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Résumé rapide pour les apprenants..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-900 focus:border-sky-500 focus:outline-none dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsUploadOpen(false)}
-                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-6 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-sky-500/20 hover:bg-sky-700 active:scale-95"
-                >
-                  <Plus size={16} />
-                  <span>{isAdmin ? 'Publier le document' : 'Soumettre pour validation'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
+      {!error && !documents && (
+        <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+          <p className="mt-3 text-xs font-medium">Chargement de la bibliothèque...</p>
         </div>
       )}
 
-      {/* MODALE DE LECTURE DU DOCUMENT */}
-      {selectedDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-[fade-in_0.2s_ease-out]">
-          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-200/80 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-md shadow-sky-500/20">
-                  <BookOpen size={20} />
-                </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                    {selectedDoc.category} • {selectedDoc.format}
-                  </span>
-                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 line-clamp-1">
-                    {selectedDoc.title}
-                  </h3>
-                </div>
-              </div>
+      {documents && documents.length === 0 && (
+        <div className="rounded-3xl border border-dashed border-slate-200 px-4 py-14 text-center dark:border-slate-800">
+          <FileText size={32} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Aucun document publié pour le moment.</p>
+        </div>
+      )}
 
-              <button
-                onClick={() => setSelectedDoc(null)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {documents && documents.length > 0 && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {documents.map((document) => (
               <div
-                className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${COVER_GRADIENTS[selectedDoc.coverTheme]
-                  } p-6 shadow-lg border border-white/10`}
+                key={document.id}
+                className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 shadow-md shadow-slate-500/5 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-sky-300 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500/30"
               >
-                <div className="flex items-center justify-between text-xs font-bold text-white/90">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider backdrop-blur-md">
-                    <Sparkles size={12} />
-                    {selectedDoc.format} Officiel
+                {/* APERÇU RÉEL DU DOCUMENT (première page) */}
+                <div className="relative h-40 shrink-0 overflow-hidden border-b border-slate-100 bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60">
+                  {document.format === 'PDF' ? (
+                    <Suspense
+                      fallback={
+                        <div className="flex h-full items-center justify-center">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                        </div>
+                      }
+                    >
+                      <PdfThumbnail url={document.fichier} />
+                    </Suspense>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-1.5 text-slate-300 dark:text-slate-600">
+                      <BookOpen size={28} />
+                      <span className="text-[10px] font-bold uppercase tracking-wide">Aperçu indisponible</span>
+                    </div>
+                  )}
+                  <span className="absolute right-2 top-2 rounded-lg bg-slate-900/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    {document.format}
                   </span>
-                  <span>{selectedDoc.pages} Pages • {selectedDoc.fileSize}</span>
                 </div>
 
-                <div className="my-6 max-w-lg">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-sky-200">
-                    Édition AI Learning
-                  </span>
-                  <h2 className="text-xl font-black text-white sm:text-2xl mt-1 leading-tight">
-                    {selectedDoc.title}
-                  </h2>
-                  <p className="text-xs text-white/80 mt-2 font-medium">
-                    Par {selectedDoc.author}
-                  </p>
+                <div className="flex flex-1 flex-col justify-between p-5">
+                  <div>
+                    <span className="inline-flex items-center rounded-xl bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                      {document.categorie_nom}
+                    </span>
+                    <h3 className="mt-3 text-sm font-extrabold text-slate-900 dark:text-slate-100">{document.titre}</h3>
+                    <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      {document.description || 'Aucune description fournie.'}
+                    </p>
+                  </div>
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400">
+                      {document.auteur_nom} · {formatTaille(document.taille_octets)}
+                    </span>
+                    <a
+                      href={document.fichier}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600 dark:bg-slate-800 dark:hover:bg-sky-600"
+                    >
+                      <Download size={13} />
+                      Ouvrir
+                    </a>
+                  </div>
                 </div>
               </div>
-
-              <div className="rounded-2xl bg-sky-50/70 p-4 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-900/40">
-                <h4 className="text-xs font-bold text-sky-900 dark:text-sky-300">À propos de cet ouvrage :</h4>
-                <p className="mt-1 text-xs text-sky-800/90 dark:text-sky-400 leading-relaxed">
-                  {selectedDoc.description}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Extrait du contenu :</h4>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-line dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                  {selectedDoc.contentPreview}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-slate-200/80 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-              <span className="text-xs font-semibold text-slate-500">Auteur : {selectedDoc.author}</span>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    handleDownload(selectedDoc)
-                    setSelectedDoc(null)
-                  }}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-sky-700 active:scale-95"
-                >
-                  <Download size={15} />
-                  Télécharger le document complet
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
+          <Pagination count={count} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        </>
+      )}
+
+      {/* MES DÉPÔTS — FORMATEUR / ADMIN */}
+      {canUpload && (
+        <div>
+          <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+            <BookOpen size={18} className="text-indigo-500" />
+            Mes dépôts
+          </h2>
+
+          {!mesDocuments ? (
+            <p className="text-sm text-slate-400">Chargement...</p>
+          ) : mesDocuments.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-200 px-4 py-10 text-center dark:border-slate-800">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Vous n'avez encore rien déposé dans la bibliothèque.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-3xl border border-slate-200/80 bg-white/90 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+              <table className="w-full min-w-[600px] text-left text-xs">
+                <thead className="border-b border-slate-200/80 bg-slate-100/70 text-[11px] font-bold tracking-wider text-slate-500 uppercase dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+                  <tr>
+                    <th className="py-3 px-5">Document</th>
+                    <th className="py-3 px-5">Statut</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {mesDocuments.map((document) => (
+                    <tr key={document.id}>
+                      <td className="py-3 px-5">
+                        <p className="font-bold text-slate-900 dark:text-slate-100">{document.titre}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {document.categorie_nom} · {document.format}
+                        </p>
+                        {document.statut === 'REFUSE' && document.motif_refus && (
+                          <p className="mt-1 text-[11px] text-red-500 dark:text-red-400">{document.motif_refus}</p>
+                        )}
+                      </td>
+                      <td className="py-3 px-5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${DOCUMENT_STATUT_BADGE_STYLES[document.statut]}`}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                          {DOCUMENT_STATUT_LABELS[document.statut]}
+                        </span>
+                      </td>
+                      <td className="py-3 px-5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {document.statut === 'BROUILLON' && (
+                            <button
+                              onClick={() => handleSubmitForReview(document)}
+                              className="flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-sky-700"
+                            >
+                              <Send size={12} />
+                              Soumettre
+                            </button>
+                          )}
+                          {document.statut === 'SOUMIS' && (
+                            <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                              <Clock size={12} />
+                              En attente
+                            </span>
+                          )}
+                          {document.statut === 'PUBLIE' && (
+                            <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 size={12} />
+                              En ligne
+                            </span>
+                          )}
+                          {document.statut === 'PUBLIE' && (
+                            <button
+                              onClick={() => handleUnpublish(document)}
+                              className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-300"
+                            >
+                              Dépublier
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteDocument(document)}
+                            className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 dark:text-slate-600 dark:hover:bg-red-500/10"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
+
+      {/* MODALE DE DÉPÔT */}
+      <Modal open={isUploadOpen} onClose={() => setIsUploadOpen(false)} title="Déposer un document">
+        <form onSubmit={handleUpload} className="space-y-4">
+          {uploadError && <Alert variant="error" message={uploadError} />}
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Fichier</label>
+            <input
+              required
+              type="file"
+              accept=".pdf,.epub"
+              onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-sm text-slate-900 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Titre</label>
+            <input
+              required
+              value={newTitre}
+              onChange={(event) => {
+                setTitreTouche(true)
+                setNewTitre(event.target.value)
+              }}
+              placeholder="Repris automatiquement du nom du fichier"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Description</label>
+            <textarea
+              value={newDescription}
+              onChange={(event) => setNewDescription(event.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Catégorie</label>
+              {categories.length === 0 ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">Aucune catégorie disponible.</p>
+              ) : (
+                <select
+                  required
+                  value={newCategorie}
+                  onChange={(event) => setNewCategorie(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {categories.map((categorie) => (
+                    <option key={categorie.id} value={categorie.id}>
+                      {categorie.nom}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">Format</label>
+              <select
+                value={newFormat}
+                onChange={(event) => setNewFormat(event.target.value as 'PDF' | 'EPUB')}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:border-sky-500 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              >
+                <option value="PDF">PDF</option>
+                <option value="EPUB">EPUB</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(false)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={isUploading || !newFile || !newCategorie || !newTitre.trim()}
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+            >
+              <Plus size={15} />
+              {isUploading ? 'Envoi...' : 'Déposer'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

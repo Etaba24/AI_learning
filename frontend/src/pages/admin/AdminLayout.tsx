@@ -4,6 +4,7 @@ import {
   Building2,
   CheckCircle,
   ChevronDown,
+  CreditCard,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   PanelLeftOpen,
   Plus,
   Search,
+  Settings,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -23,63 +25,70 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ROLE_LABELS } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { useConfirm } from '../../components/ConfirmContext'
 import { useTheme } from '../../theme/ThemeContext'
 
-const NAV_GROUPS = [
-  {
-    label: 'Pilotage',
-    items: [{ to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true }],
-  },
-  {
-    label: 'Utilisateurs & Accès',
-    items: [
-      { to: '/admin/apprenants', label: 'Apprenants', icon: Users, end: false },
-      { to: '/admin/formateurs', label: 'Formateurs', icon: GraduationCap, end: false },
-    ],
-  },
-  {
-    label: 'Pédagogie & Catalogue',
-    items: [
-      { to: '/admin/creer-formation', label: 'Créer une formation', icon: Plus, end: false },
-      { to: '/admin/formations', label: 'Toutes les formations', icon: BookOpen, end: false },
-      { to: '/admin/formations/moderation', label: 'Validation formateurs', icon: CheckCircle, end: false },
-      { to: '/admin/categories', label: 'Catégories', icon: Tags, end: false },
-      { to: '/admin/departements', label: 'Départements', icon: Building2, end: false },
-      { to: '/admin/certifications', label: 'Référentiel certifications', icon: GraduationCap, end: false },
-    ],
-  },
-  {
-    label: 'Sécurité & Système',
-    items: [
-      { to: '/admin/logs', label: "Journaux d'activité", icon: FileText, end: false },
-      { to: '/admin/settings', label: 'Paramètres globaux', icon: ShieldCheck, end: false },
-    ],
-  },
-]
-
-const PAGE_TITLES: Record<string, { category: string; title: string; subtitle: string }> = {
-  '/admin': { category: 'Pilotage', title: 'Tableau de bord', subtitle: "Aperçu global de l'activité et des flux de la plateforme." },
-  '/admin/apprenants': { category: 'Utilisateurs & Accès', title: 'Apprenants', subtitle: 'Comptes, statut et accès des apprenants.' },
-  '/admin/formateurs': { category: 'Utilisateurs & Accès', title: 'Formateurs', subtitle: "Comptes formateurs — création réservée à l'administrateur." },
-  '/admin/creer-formation': { category: 'Pédagogie & Catalogue', title: 'Créer une formation (Assistant Pas-à-Pas)', subtitle: 'Conception méthodique des modules, leçons, vidéos, supports et exercices.' },
-  '/admin/formations': { category: 'Pédagogie & Catalogue', title: 'Catalogue des formations', subtitle: 'Suivi et gestion de l’ensemble des modules pédagogiques.' },
-  '/admin/formations/moderation': { category: 'Pédagogie & Catalogue', title: 'Validation des formateurs', subtitle: 'Modération et validation des contenus soumis.' },
-  '/admin/categories': { category: 'Pédagogie & Catalogue', title: 'Catégories', subtitle: 'Organisation et arborescence des thématiques de formation.' },
-  '/admin/departements': { category: 'Pédagogie & Catalogue', title: 'Départements', subtitle: 'Un formateur ne peut publier que dans son propre département.' },
-  '/admin/certifications': { category: 'Pédagogie & Catalogue', title: 'Référentiel certifications', subtitle: 'Gestion des diplômes et attestations délivrés.' },
-  '/admin/logs': { category: 'Sécurité & Système', title: "Journaux d'activité", subtitle: 'Audit de sécurité et traçabilité des actions sensibles.' },
-  '/admin/settings': { category: 'Sécurité & Système', title: 'Paramètres globaux', subtitle: 'Configuration générale et options de la plateforme.' },
-}
-
 export function AdminLayout() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
   const confirm = useConfirm()
+
+  const NAV_GROUPS = [
+    {
+      label: t('admin.nav.pilotage'),
+      items: [{ to: '/admin', label: t('admin.nav.dashboard'), icon: LayoutDashboard, end: true }],
+    },
+    {
+      label: t('admin.nav.usersAccess'),
+      items: [
+        { to: '/admin/apprenants', label: t('admin.nav.apprenants'), icon: Users, end: false },
+        { to: '/admin/formateurs', label: t('admin.nav.formateurs'), icon: GraduationCap, end: false },
+      ],
+    },
+    {
+      label: t('admin.nav.pedagogy'),
+      items: [
+        { to: '/admin/creer-formation', label: t('admin.nav.createFormation'), icon: Plus, end: false },
+        { to: '/admin/formations', label: t('admin.nav.allFormations'), icon: BookOpen, end: false },
+        { to: '/admin/documents', label: t('admin.nav.documents'), icon: CheckCircle, end: false },
+        { to: '/admin/categories', label: t('admin.nav.categories'), icon: Tags, end: false },
+        { to: '/admin/departements', label: t('admin.nav.departements'), icon: Building2, end: false },
+      ],
+    },
+    {
+      label: t('admin.nav.monetization'),
+      items: [
+        { to: '/admin/etablissements', label: t('admin.nav.etablissements'), icon: Building2, end: false },
+        { to: '/admin/abonnements', label: t('admin.nav.abonnements'), icon: CreditCard, end: false },
+      ],
+    },
+    {
+      label: t('admin.nav.security'),
+      items: [
+        { to: '/admin/logs', label: t('admin.nav.logs'), icon: FileText, end: false },
+        { to: '/admin/settings', label: t('admin.nav.settings'), icon: ShieldCheck, end: false },
+      ],
+    },
+  ]
+
+  const PAGE_TITLES: Record<string, { category: string; title: string; subtitle: string }> = {
+    '/admin': { category: t('admin.nav.pilotage'), ...(t('admin.pageTitles.dashboard', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/apprenants': { category: t('admin.nav.usersAccess'), ...(t('admin.pageTitles.apprenants', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/formateurs': { category: t('admin.nav.usersAccess'), ...(t('admin.pageTitles.formateurs', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/creer-formation': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.createFormation', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/formations': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.allFormations', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/documents': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.documents', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/categories': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.categories', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/departements': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.departements', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/logs': { category: t('admin.nav.security'), ...(t('admin.pageTitles.logs', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/settings': { category: t('admin.nav.security'), ...(t('admin.pageTitles.settings', { returnObjects: true }) as { title: string; subtitle: string }) },
+  }
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -105,19 +114,15 @@ export function AdminLayout() {
   }, [])
 
   const initial = (user?.first_name || user?.email || '?').charAt(0).toUpperCase()
-  const userName = user?.first_name || user?.email?.split('@')[0] || 'Administrateur'
+  const userName = user?.first_name || user?.email?.split('@')[0] || t('admin.roleFallbackLong')
   const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || userName
-  const currentPageInfo = PAGE_TITLES[location.pathname] || {
-    category: 'Console',
-    title: 'Administration',
-    subtitle: 'Gestion de la plateforme AI Learning.',
-  }
+  const currentPageInfo = PAGE_TITLES[location.pathname] || (t('admin.fallbackPage', { returnObjects: true }) as { category: string; title: string; subtitle: string })
 
   async function handleLogoutClick() {
     const ok = await confirm({
-      title: 'Se déconnecter ?',
-      message: 'Êtes-vous sûr de vouloir fermer votre session administrateur ?',
-      confirmLabel: 'Déconnexion',
+      title: t('admin.logoutConfirm.title'),
+      message: t('admin.logoutConfirm.message'),
+      confirmLabel: t('admin.logoutConfirm.confirmLabel'),
       variant: 'warning',
     })
     if (ok) {
@@ -153,7 +158,7 @@ export function AdminLayout() {
                   AI Learning
                 </span>
                 <span className="block text-[10px] font-bold tracking-wider text-sky-600 uppercase dark:text-sky-400">
-                  Admin Workspace
+                  {t('admin.workspaceLabel')}
                 </span>
               </div>
             )}
@@ -203,16 +208,35 @@ export function AdminLayout() {
           ))}
         </nav>
 
-        {/* PIED DE SIDEBAR : RACCORDS SECONDAIRES ET COLLAPSE */}
+        {/* PIED DE SIDEBAR : PROFIL */}
         <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 md:flex dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
-            title={isSidebarCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            {!isSidebarCollapsed && <span>Réduire la barre</span>}
-          </button>
+          <div className={`flex items-center gap-2.5 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 text-xs font-bold text-white">
+              {initial}
+            </div>
+            {!isSidebarCollapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{userName}</p>
+                  <p className="truncate text-[10px] text-slate-400">{user?.email}</p>
+                </div>
+                <NavLink
+                  to="/admin/settings"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  aria-label={t('admin.sidebarFooter.settingsAria')}
+                >
+                  <Settings size={14} />
+                </NavLink>
+                <button
+                  onClick={handleLogoutClick}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                  aria-label={t('admin.sidebarFooter.logoutAria')}
+                >
+                  <LogOut size={14} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -226,7 +250,7 @@ export function AdminLayout() {
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 md:hidden dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-              aria-label="Ouvrir le menu"
+              aria-label={t('admin.openMenuAria')}
             >
               <Menu size={20} />
             </button>
@@ -235,7 +259,7 @@ export function AdminLayout() {
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className="hidden md:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800"
-              title={isSidebarCollapsed ? 'Agrandir la barre latérale' : 'Réduire la barre latérale'}
+              title={isSidebarCollapsed ? t('admin.header.expandTitle') : t('admin.header.collapseTitle')}
             >
               {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </button>
@@ -243,7 +267,7 @@ export function AdminLayout() {
             {/* Fil d'ariane & Titre de la page */}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
-                <span>Console</span>
+                <span>{t('admin.breadcrumbRoot')}</span>
                 <span>/</span>
                 <span className="text-sky-600 dark:text-sky-400">{currentPageInfo.category}</span>
               </div>
@@ -261,7 +285,7 @@ export function AdminLayout() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une formation, un utilisateur..."
+                placeholder={t('admin.searchPlaceholder')}
                 className="w-full rounded-2xl border border-slate-200/90 bg-slate-50/90 py-2 pl-9 pr-12 text-xs font-medium text-slate-900 placeholder-slate-400 transition-all focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-sky-400 dark:focus:bg-slate-900"
               />
               {searchQuery ? (
@@ -285,7 +309,7 @@ export function AdminLayout() {
             <button
               onClick={toggleTheme}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              title={theme === 'dark' ? 'Passer au mode clair' : 'Passer au mode sombre'}
+              title={theme === 'dark' ? t('admin.themeLight') : t('admin.themeDark')}
             >
               {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-slate-600" />}
             </button>
@@ -295,7 +319,7 @@ export function AdminLayout() {
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label="Notifications"
+                aria-label={t('admin.notificationsAria')}
               >
                 <Bell size={18} />
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
@@ -306,16 +330,16 @@ export function AdminLayout() {
                 <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl animate-[popup-in_0.25s_cubic-bezier(0.16,1,0.3,1)] dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">Notifications</h3>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">{t('admin.notifTitle')}</h3>
                       <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                        1 nouvelle
+                        {t('admin.notif1New')}
                       </span>
                     </div>
                     <button
                       onClick={() => setShowNotifications(false)}
                       className="text-[11px] font-semibold text-sky-600 hover:underline dark:text-sky-400"
                     >
-                      Tout marquer lu
+                      {t('admin.notifMarkRead')}
                     </button>
                   </div>
 
@@ -325,12 +349,12 @@ export function AdminLayout() {
                         <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
                         <div>
                           <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                            Formation en attente de modération
+                            {t('admin.notifItemTitle')}
                           </p>
                           <p className="mt-0.5 text-[11px] text-amber-800/80 dark:text-amber-300/80">
-                            Un formateur a soumis un nouveau module pédagogique.
+                            {t('admin.notifItemBody')}
                           </p>
-                          <span className="mt-1 block text-[10px] font-medium text-amber-600 dark:text-amber-400">Il y a 10 min</span>
+                          <span className="mt-1 block text-[10px] font-medium text-amber-600 dark:text-amber-400">{t('admin.notifItemTime')}</span>
                         </div>
                       </div>
                     </div>
@@ -342,7 +366,7 @@ export function AdminLayout() {
                       onClick={() => setShowNotifications(false)}
                       className="text-[11px] font-bold text-slate-500 hover:text-sky-600 dark:hover:text-sky-400"
                     >
-                      Voir le centre de modération →
+                      {t('admin.notifViewAll')}
                     </NavLink>
                   </div>
                 </div>
@@ -364,7 +388,7 @@ export function AdminLayout() {
                 <div className="hidden text-left sm:block">
                   <p className="text-xs font-bold leading-tight text-slate-900 dark:text-slate-100">{userName}</p>
                   <p className="text-[10px] font-medium leading-none text-slate-400">
-                    {user ? ROLE_LABELS[user.role] : 'Admin'}
+                    {user ? ROLE_LABELS[user.role] : t('admin.roleFallbackShort')}
                   </p>
                 </div>
                 <ChevronDown size={14} className="text-slate-400" />
@@ -385,7 +409,7 @@ export function AdminLayout() {
                     </div>
                     <div className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
                       <Sparkles size={11} />
-                      {user ? ROLE_LABELS[user.role] : 'Administrateur'}
+                      {user ? ROLE_LABELS[user.role] : t('admin.roleFallbackLong')}
                     </div>
                   </div>
 
@@ -396,7 +420,7 @@ export function AdminLayout() {
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       <User size={15} className="text-slate-400" />
-                      Mon profil & Paramètres
+                      {t('admin.profileMenuLink')}
                     </NavLink>
                   </div>
 
@@ -409,7 +433,7 @@ export function AdminLayout() {
                       className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
                     >
                       <LogOut size={15} />
-                      Se déconnecter
+                      {t('admin.logout')}
                     </button>
                   </div>
                 </div>

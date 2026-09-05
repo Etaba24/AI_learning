@@ -2,8 +2,10 @@ import { BarChart2, BookOpen, Clock, ArrowRight, Search, Sparkles, X } from 'luc
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
-import { NIVEAU_LABELS, type Niveau, type PaginatedResponse, type PublicFormation } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type Niveau, type PaginatedResponse, type PublicFormation } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { Pagination } from '../../components/Pagination'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 const NIVEAUX: Array<{ label: string; value: Niveau | 'ALL' }> = [
   { label: 'Tous les niveaux', value: 'ALL' },
@@ -14,24 +16,35 @@ const NIVEAUX: Array<{ label: string; value: Niveau | 'ALL' }> = [
 
 export function CataloguePage() {
   const [formations, setFormations] = useState<PublicFormation[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [niveau, setNiveau] = useState<Niveau | 'ALL'>('ALL')
 
-  useEffect(() => {
+  function loadFormations() {
     const params = new URLSearchParams()
     if (search.trim()) params.set('q', search.trim())
     if (niveau !== 'ALL') params.set('niveau', niveau)
-    const query = params.toString()
+    params.set('page', String(page))
 
-    const timeout = setTimeout(() => {
-      apiFetch<PaginatedResponse<PublicFormation>>(`/catalogue/formations/${query ? `?${query}` : ''}`)
-        .then((data) => setFormations(data.results))
-        .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
-    }, 250)
+    apiFetch<PaginatedResponse<PublicFormation>>(`/catalogue/formations/?${params.toString()}`)
+      .then((data) => {
+        setFormations(data.results)
+        setCount(data.count)
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
+  }
 
+  useEffect(() => {
+    const timeout = setTimeout(loadFormations, 250)
     return () => clearTimeout(timeout)
-  }, [search, niveau])
+  }, [search, niveau, page])
+  useEffect(() => setPage(1), [search, niveau])
+
+  // Une formation publiée/dépubliée/modifiée ailleurs (admin, formateur)
+  // met à jour ce catalogue sans que l'apprenant ait à relancer sa recherche.
+  useRealtimeTopics(['catalogue'], loadFormations)
 
   return (
     <div className="space-y-6">
@@ -168,6 +181,10 @@ export function CataloguePage() {
             </Link>
           ))}
         </div>
+      )}
+
+      {formations && formations.length > 0 && (
+        <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       )}
     </div>
   )

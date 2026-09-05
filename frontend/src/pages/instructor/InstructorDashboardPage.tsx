@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Eye,
   Edit3,
+  X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -17,18 +18,22 @@ import { apiFetch, ApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
 import { NIVEAU_LABELS, STATUT_BADGE_STYLES, STATUT_LABELS, type Formation, type PaginatedResponse } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 export function InstructorDashboardPage() {
   const { user } = useAuth()
   const [formations, setFormations] = useState<Formation[] | null>(null)
+  const [selectedFormationForPreview, setSelectedFormationForPreview] = useState<Formation | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Charger les formations attribuées / créées par le formateur
+  function loadFormations() {
     apiFetch<PaginatedResponse<Formation>>('/formations/')
       .then((data) => setFormations(data.results))
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement de vos formations.'))
-  }, [])
+  }
+
+  useEffect(loadFormations, [])
+  useRealtimeTopics(['instructor_formations'], loadFormations)
 
   if (error) {
     return <Alert variant="error" message={error} />
@@ -213,15 +218,16 @@ export function InstructorDashboardPage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Link
-                      to={`/apprenant/formations/${f.id}`}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFormationForPreview(f)}
                       className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200"
                     >
                       <Eye size={14} />
                       Aperçu
-                    </Link>
+                    </button>
                     <Link
-                      to={`/formateur/mes-formations`}
+                      to={`/formateur/creer-formation/${f.id}`}
                       className="flex items-center justify-center gap-1.5 rounded-2xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-indigo-700 active:scale-95"
                     >
                       <Edit3 size={14} />
@@ -234,6 +240,93 @@ export function InstructorDashboardPage() {
           </div>
         )}
       </div>
+
+      {selectedFormationForPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-[fade-in_0.2s_ease-out]">
+          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+                  Aperçu formateur
+                </p>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  {selectedFormationForPreview.titre}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFormationForPreview(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/40">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex items-center rounded-xl bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                    {selectedFormationForPreview.categorie_nom}
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUT_BADGE_STYLES[selectedFormationForPreview.statut]}`}>
+                    {STATUT_LABELS[selectedFormationForPreview.statut]}
+                  </span>
+                </div>
+
+                <p className="mt-4 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {selectedFormationForPreview.description || 'Aucune description disponible.'}
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Niveau</span>
+                    {NIVEAU_LABELS[selectedFormationForPreview.niveau]}
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Durée</span>
+                    {selectedFormationForPreview.duree_heures} h
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-400">Département</span>
+                    {selectedFormationForPreview.departement_nom || 'Non renseigné'}
+                  </div>
+                </div>
+              </div>
+
+              {(selectedFormationForPreview.modules?.length ?? 0) > 0 ? (
+                <div className="space-y-4">
+                  {selectedFormationForPreview.modules?.map((module, index) => (
+                    <div key={module.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                      <h4 className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                        Module {index + 1} : {module.titre}
+                      </h4>
+                      {module.description && (
+                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{module.description}</p>
+                      )}
+
+                      {module.lecons?.length ? (
+                        <ul className="mt-3 space-y-2 pl-4 text-[11px] text-slate-600 dark:text-slate-300">
+                          {module.lecons.map((lecon) => (
+                            <li key={lecon.id} className="list-disc">
+                              {lecon.titre}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-3 text-[11px] text-slate-400">Aucune leçon renseignée dans ce module.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  Aucun module détaillé n’est disponible pour cet aperçu.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FLUX D'ACTIVITÉ RÉCENTE DES APPRENANTS */}
       <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">

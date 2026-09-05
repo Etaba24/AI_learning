@@ -1,12 +1,26 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { apiFetch, clearTokens, getAccessToken, setTokens } from '../api/client'
-import type { User } from '../api/types'
+import type { MonAbonnement, User } from '../api/types'
 
 interface AuthContextValue {
   user: User | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<User>
+  // Pour les connexions qui obtiennent déjà des jetons autrement qu'avec un
+  // mot de passe (Google) : on stocke les jetons reçus et on récupère le
+  // profil, sans repasser par /auth/login/.
+  loginWithTokens: (tokens: { access: string; refresh: string }) => Promise<User>
   logout: () => void
+  // Recharge le profil depuis le serveur (ex: après modification dans la
+  // page Paramètres) pour que le nom/avatar affichés dans la sidebar et le
+  // menu profil se mettent à jour sans recharger la page.
+  refreshUser: () => Promise<void>
+  // Statut d'abonnement centralisé ici (et pas re-fetché localement dans
+  // chaque page) : sans ça, le bandeau du pied de sidebar — qui ne
+  // remonte jamais entre deux pages de l'espace apprenant — reste bloqué
+  // sur l'ancien statut après une rétrogradation/réabonnement ailleurs.
+  abonnement: MonAbonnement | null
+  refreshAbonnement: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -17,6 +31,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ne sait pas encore si l'utilisateur est connecté -> évite un flash vers
   // /login au rechargement de page alors qu'une session existe déjà.
   const [isLoading, setIsLoading] = useState(true)
+  const [abonnement, setAbonnement] = useState<MonAbonnement | null>(null)
+
+  async function loadAbonnement() {
+    try {
+      setAbonnement(await apiFetch<MonAbonnement>('/mon-abonnement/'))
+    } catch {
+      setAbonnement(null)
+    }
+  }
 
   useEffect(() => {
     async function loadCurrentUser() {
@@ -27,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await apiFetch<User>('/users/me/')
         setUser(me)
+        await loadAbonnement()
       } catch {
         clearTokens()
       } finally {
@@ -45,16 +69,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokens(tokens)
     const me = await apiFetch<User>('/users/me/')
     setUser(me)
+    await loadAbonnement()
+    return me
+  }
+
+  async function loginWithTokens(tokens: { access: string; refresh: string }): Promise<User> {
+    setTokens(tokens)
+    const me = await apiFetch<User>('/users/me/')
+    setUser(me)
+    await loadAbonnement()
     return me
   }
 
   function logout() {
     clearTokens()
     setUser(null)
+    setAbonnement(null)
+  }
+
+  async function refreshUser() {
+    const me = await apiFetch<User>('/users/me/')
+    setUser(me)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, loginWithTokens, logout, refreshUser, abonnement, refreshAbonnement: loadAbonnement }}
+    >
       {children}
     </AuthContext.Provider>
   )

@@ -1,5 +1,6 @@
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -16,13 +17,6 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined)
-
-const DEFAULT_TITLES: Record<ToastType, string> = {
-  success: 'Succès',
-  error: 'Erreur',
-  warning: 'Attention',
-  info: 'Information',
-}
 
 const STYLES: Record<
   ToastType,
@@ -83,6 +77,7 @@ function ToastCard({
   toast: ToastItem
   onDismiss: (id: number) => void
 }) {
+  const { t } = useTranslation()
   const [isLeaving, setIsLeaving] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const duration = toast.duration ?? 4000
@@ -100,7 +95,7 @@ function ToastCard({
 
   const style = STYLES[toast.type]
   const Icon = style.icon
-  const displayTitle = toast.title ?? DEFAULT_TITLES[toast.type]
+  const displayTitle = toast.title ?? t(`toast.title.${toast.type}`)
 
   return (
     <div
@@ -128,7 +123,7 @@ function ToastCard({
         <button
           onClick={handleDismiss}
           className="shrink-0 rounded-lg p-1 text-slate-400 opacity-70 transition-all hover:bg-slate-100 hover:opacity-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          aria-label="Fermer la notification"
+          aria-label={t('toast.closeAria')}
         >
           <X size={16} />
         </button>

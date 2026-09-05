@@ -33,6 +33,10 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 # Application definition
 
 INSTALLED_APPS = [
+    # 'daphne' en tête : remplace la commande `runserver` par une version
+    # ASGI capable de servir HTTP et WebSocket sur le même process, sans
+    # rien changer à la façon de lancer le serveur en développement.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -43,6 +47,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'channels',
     # Apps du projet
     'core',
     'accounts',
@@ -56,6 +61,9 @@ INSTALLED_APPS = [
     'notes',
     'boards',
     'modeling',
+    'billing',
+    'messaging',
+    'library',
 ]
 
 MIDDLEWARE = [
@@ -87,6 +95,18 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Couche de canal en mémoire : suffisant pour un unique process ASGI (le cas
+# ici). Ne fonctionnerait pas telle quelle avec plusieurs workers/process en
+# production (les groupes ne seraient pas partagés) — il faudrait alors une
+# vraie couche partagée (Redis, via channels-redis) ; pas nécessaire tant que
+# le déploiement reste mono-process.
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 
 # Database
@@ -133,6 +153,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Fichiers déposés par les utilisateurs (PDF/EPUB de la bibliothèque) — stockage
+# disque local en dev ; à remplacer par un stockage objet (S3/MinIO) en
+# production (voir section 12 du cahier des charges, déjà anticipé pour les
+# avatars via avatar_url).
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Email
 # En dev, les emails (ex. réinitialisation de mot de passe, RF-003) sont
@@ -160,6 +187,12 @@ DEEPSEEK_API_KEY = env('DEEPSEEK_API_KEY', default='')
 JDOODLE_CLIENT_ID = env('JDOODLE_CLIENT_ID', default='')
 JDOODLE_CLIENT_SECRET = env('JDOODLE_CLIENT_SECRET', default='')
 
+# Connexion/inscription avec Google. Cet identifiant n'est PAS un secret (il
+# est aussi utilisé côté frontend, embarqué dans le JS servi au navigateur) —
+# mais reste vide par défaut : tant qu'il n'est pas fourni, /api/auth/google/
+# renvoie une 503 honnête plutôt que d'accepter des jetons non vérifiables.
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
+
 
 # Modèle utilisateur personnalisé (défini dans l'app accounts, section 4)
 AUTH_USER_MODEL = 'accounts.User'
@@ -174,7 +207,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 7,
 }
 
 # djangorestframework-simplejwt (RF-002, RNF-001)
@@ -191,3 +224,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     'CORS_ALLOWED_ORIGINS',
     default=['http://localhost:5173', 'http://localhost:3000'],
 )
+
+# Base du frontend, pour construire un lien cliquable dans les emails
+# envoyés par le backend (réinitialisation de mot de passe...).
+FRONTEND_URL = env.str('FRONTEND_URL', default='http://localhost:5173')

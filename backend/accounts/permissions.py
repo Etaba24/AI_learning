@@ -31,3 +31,20 @@ class IsInstructorOrAdmin(BasePermission):
             and request.user.role in (User.Role.ADMIN, User.Role.INSTRUCTOR)
         )
 
+
+class IsEtablissementAdmin(BasePermission):
+    """Réservé au responsable d'un établissement client (B2B) — jamais
+    l'admin plateforme. `etablissement_id` obligatoire : sans établissement
+    rattaché, ce rôle n'aurait aucune donnée à scoper (ne devrait pas
+    arriver en pratique, mais la vue ne doit jamais planter dessus)."""
+
+    message = "Réservé aux administrateurs d'établissement."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == User.Role.ETABLISSEMENT_ADMIN
+            and request.user.etablissement_id
+        )
+

@@ -2,7 +2,9 @@ import { ArrowLeft, FileSpreadsheet, Loader2, Plus, Save, Trash2 } from 'lucide-
 import { useEffect, useState } from 'react'
 import Spreadsheet, { createEmptyMatrix, type CellBase, type Matrix } from 'react-spreadsheet'
 import { apiFetch, ApiError } from '../../api/client'
+import { DEFAULT_PAGE_SIZE } from '../../api/types'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
 import { useTheme } from '../../theme/ThemeContext'
 
@@ -36,6 +38,8 @@ export function TableurPage() {
   const { showToast } = useToast()
 
   const [classeurs, setClasseurs] = useState<ClasseurSummary[] | null>(null)
+  const [classeursCount, setClasseursCount] = useState(0)
+  const [classeursPage, setClasseursPage] = useState(1)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   // Classeur ouvert dans l'éditeur (null = vue liste)
@@ -46,13 +50,14 @@ export function TableurPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
 
-  useEffect(() => {
-    refreshList()
-  }, [])
+  useEffect(refreshList, [classeursPage])
 
   function refreshList() {
-    apiFetch<PaginatedResponse<ClasseurSummary>>('/classeurs/')
-      .then((res) => setClasseurs(res.results))
+    apiFetch<PaginatedResponse<ClasseurSummary>>(`/classeurs/?page=${classeursPage}`)
+      .then((res) => {
+        setClasseurs(res.results)
+        setClasseursCount(res.count)
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
@@ -209,7 +214,7 @@ export function TableurPage() {
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
           <FileSpreadsheet size={18} className="text-sky-500" />
-          Mes classeurs ({classeurs.length})
+          Mes classeurs ({classeursCount})
         </h2>
         <button
           onClick={handleCreate}
@@ -257,6 +262,10 @@ export function TableurPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {classeurs.length > 0 && (
+        <Pagination count={classeursCount} page={classeursPage} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setClasseursPage} />
       )}
     </div>
   )

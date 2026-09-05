@@ -1,24 +1,62 @@
+import json
+import random
+import urllib.error
+import urllib.request
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db.models import ProtectedError
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
+from billing.models import Abonnement
+from billing.serializers import RejoindreEtablissementSerializer
 from core.utils import log_activity
 
-from .models import User
+from .models import GoogleVerificationCode, User
 from .permissions import IsAdmin, IsInstructorOrAdmin
 from .serializers import (
     AdminUserSerializer,
+    GoogleAuthSerializer,
+    GoogleConfirmSerializer,
+    PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserSerializer,
 )
+
+GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+
+def _verify_google_credential(credential):
+    """Vérifie le jeton d'identité Google auprès de Google lui-même (jamais
+    décodé "à l'aveugle" côté serveur) : renvoie les infos du compte si
+    valide, sinon None. `aud` doit correspondre à NOTRE client Google —
+    sinon n'importe quel jeton Google valide d'une autre appli serait accepté."""
+
+    url = f"{GOOGLE_TOKENINFO_URL}?id_token={credential}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError):
+        return None
+
+    if not settings.GOOGLE_CLIENT_ID or data.get("aud") != settings.GOOGLE_CLIENT_ID:
+        return None
+    if data.get("email_verified") != "true":
+        return None
+    if data.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+        return None
+    return data
 
 
 class RegisterView(generics.CreateAPIView):
@@ -31,16 +69,180 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
 
 
-class MeView(generics.RetrieveUpdateAPIView):
-    """GET/PATCH /api/users/me/ — RF-007. `get_object` renvoie toujours
-    l'utilisateur connecté : impossible de consulter le profil de
-    quelqu'un d'autre par ce endpoint."""
+class GoogleAuthView(APIView):
+    """POST /api/auth/google/ — point d'entrée unique du bouton "Continuer
+    avec Google", connexion et inscription confondues :
+      - compte déjà existant (par google_id ou par email) -> connexion
+        immédiate, jetons renvoyés directement (comme /auth/login/).
+      - email inconnu -> pas de compte créé tout de suite : un code à 4
+        chiffres est envoyé par email, à confirmer via GoogleConfirmView."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if not settings.GOOGLE_CLIENT_ID:
+            return Response(
+                {"detail": "La connexion Google n'est pas encore configurée côté serveur."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        google_data = _verify_google_credential(serializer.validated_data["credential"])
+        if google_data is None:
+            return Response({"detail": "Jeton Google invalide ou expiré."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        google_id = google_data["sub"]
+        email = google_data["email"]
+
+        user = User.objects.filter(google_id=google_id).first() or User.objects.filter(email__iexact=email).first()
+
+        if user is not None:
+            if not user.is_active:
+                return Response({"detail": "Ce compte a été désactivé."}, status=status.HTTP_403_FORBIDDEN)
+            # Compte créé par mot de passe puis reconnu ici par email :
+            # on le rattache à ce compte Google pour la prochaine fois.
+            if not user.google_id:
+                user.google_id = google_id
+                user.save(update_fields=["google_id"])
+            refresh = RefreshToken.for_user(user)
+            log_activity(user, "GOOGLE_LOGIN")
+            return Response(
+                {"status": "logged_in", "access": str(refresh.access_token), "refresh": str(refresh)}
+            )
+
+        # Nouveau compte : code de vérification à 4 chiffres avant création.
+        code = f"{random.randint(0, 9999):04d}"
+        GoogleVerificationCode.objects.filter(email__iexact=email).delete()
+        GoogleVerificationCode.objects.create(
+            google_id=google_id,
+            email=email,
+            first_name=google_data.get("given_name", ""),
+            last_name=google_data.get("family_name", ""),
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        send_mail(
+            subject="Votre code de vérification — AI Learning",
+            message=(
+                f"Voici votre code de vérification pour créer votre compte AI Learning : {code}\n"
+                "Ce code expire dans 10 minutes."
+            ),
+            from_email=None,
+            recipient_list=[email],
+        )
+        return Response({"status": "verification_required", "email": email})
+
+
+class GoogleConfirmView(APIView):
+    """POST /api/auth/google/confirm/ — 2e étape de l'inscription Google :
+    le compte n'existe qu'à partir d'ici, une fois le code confirmé."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        pending = GoogleVerificationCode.objects.filter(email__iexact=email, consumed=False).first()
+        if pending is None or pending.expires_at < timezone.now():
+            return Response(
+                {"detail": "Code expiré ou introuvable — recommencez avec le bouton Google."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if pending.code != code:
+            return Response({"code": ["Code de vérification incorrect."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {"detail": "Un compte existe déjà avec cet email — connectez-vous plutôt."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.create_user(
+            email=pending.email,
+            password=None,  # compte Google uniquement : mot de passe inutilisable
+            first_name=pending.first_name,
+            last_name=pending.last_name,
+            role=User.Role.STUDENT,
+            google_id=pending.google_id,
+        )
+        pending.consumed = True
+        pending.save(update_fields=["consumed"])
+
+        refresh = RefreshToken.for_user(user)
+        log_activity(user, "GOOGLE_REGISTER")
+        return Response(
+            {"access": str(refresh.access_token), "refresh": str(refresh)}, status=status.HTTP_201_CREATED
+        )
+
+
+class RejoindreEtablissementView(APIView):
+    """POST /api/auth/etablissement/rejoindre/ — 2e moitié du parcours
+    "code responsable" (le platform admin en génère un depuis la fiche de
+    l'établissement, cf. billing.EtablissementCodeResponsableView) : crée
+    directement le compte ETABLISSEMENT_ADMIN et connecte, en un seul geste
+    — le responsable n'a en général pas encore de compte à ce stade."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RejoindreEtablissementSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # validate_code a déjà transformé la chaîne en l'objet ResponsableInvitationCode.
+        pending_code = serializer.validated_data["code"]
+
+        user = User.objects.create_user(
+            email=serializer.validated_data["email"],
+            password=serializer.validated_data["password"],
+            first_name=serializer.validated_data["first_name"],
+            last_name=serializer.validated_data["last_name"],
+            role=User.Role.ETABLISSEMENT_ADMIN,
+            etablissement=pending_code.etablissement,
+        )
+        pending_code.utilise = True
+        pending_code.utilise_le = timezone.now()
+        pending_code.save(update_fields=["utilise", "utilise_le"])
+
+        refresh = RefreshToken.for_user(user)
+        log_activity(user, "RESPONSABLE_ETABLISSEMENT_INSCRIPTION", pending_code.etablissement.nom)
+        return Response(
+            {"access": str(refresh.access_token), "refresh": str(refresh)}, status=status.HTTP_201_CREATED
+        )
+
+
+class MeView(generics.RetrieveUpdateDestroyAPIView):
+    """GET/PATCH/DELETE /api/users/me/ — RF-007. `get_object` renvoie
+    toujours l'utilisateur connecté : impossible de consulter/modifier le
+    profil de quelqu'un d'autre par ce endpoint.
+
+    DELETE = suppression de compte en libre-service, réservée à un
+    Apprenant ou un Formateur (jamais un Administrateur ou un responsable
+    d'établissement par ce chemin : impact organisationnel trop large pour
+    une action en un clic, sans confirmation d'un tiers)."""
 
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.role not in (User.Role.STUDENT, User.Role.INSTRUCTOR):
+            return Response(
+                {"detail": "La suppression de compte en libre-service n'est pas disponible pour ce rôle."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        email = request.user.email
+        Abonnement.objects.filter(user=request.user, statut=Abonnement.Statut.ACTIF).update(
+            statut=Abonnement.Statut.ANNULE
+        )
+        request.user.anonymiser()
+        log_activity(request.user, "COMPTE_SUPPRIME", email)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserListView(generics.ListCreateAPIView):
@@ -99,6 +301,29 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class PasswordChangeView(APIView):
+    """POST /api/auth/password-change/ — l'utilisateur connecté change
+    lui-même son mot de passe, en le prouvant via son mot de passe actuel
+    (contrairement au flux PasswordReset*, qui ne nécessite pas d'être
+    connecté et sert quand le mot de passe est oublié)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PasswordChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if not request.user.check_password(serializer.validated_data["current_password"]):
+            return Response(
+                {"current_password": ["Mot de passe actuel incorrect."]}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save(update_fields=["password"])
+        log_activity(request.user, "PASSWORD_CHANGE")
+        return Response({"detail": "Mot de passe modifié avec succès."})
+
+
 class PasswordResetRequestView(APIView):
     """POST /api/auth/password-reset/ — RF-003, étape 1 : demande de lien.
     Répond toujours 200, même si l'email n'existe pas, pour ne pas révéler
@@ -115,12 +340,13 @@ class PasswordResetRequestView(APIView):
         if user is not None:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
+            lien = f"{settings.FRONTEND_URL}/reinitialiser-mot-de-passe?uid={uid}&token={token}"
             send_mail(
                 subject="Réinitialisation de votre mot de passe — AI Learning",
                 message=(
-                    "Voici les informations pour réinitialiser votre mot de passe :\n"
-                    f"uid={uid}\ntoken={token}\n"
-                    "(en dev, transmettez-les tels quels à /api/auth/password-reset-confirm/)"
+                    "Cliquez sur ce lien pour choisir un nouveau mot de passe "
+                    f"(valable un temps limité) :\n{lien}\n\n"
+                    "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email."
                 ),
                 from_email=None,
                 recipient_list=[user.email],

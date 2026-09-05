@@ -9,11 +9,19 @@ from . import views
 
 urlpatterns = [
     path("auth/register/", views.RegisterView.as_view(), name="register"),
+    path("auth/google/", views.GoogleAuthView.as_view(), name="google_auth"),
+    path("auth/google/confirm/", views.GoogleConfirmView.as_view(), name="google_confirm"),
+    path(
+        "auth/etablissement/rejoindre/",
+        views.RejoindreEtablissementView.as_view(),
+        name="etablissement_rejoindre",
+    ),
     # TokenObtainPairView : vue toute faite de SimpleJWT. Comme USERNAME_FIELD
     # vaut "email" sur notre User, elle attend directement {"email": ..., "password": ...}.
     path("auth/login/", TokenObtainPairView.as_view(), name="login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/logout/", TokenBlacklistView.as_view(), name="logout"),
+    path("auth/password-change/", views.PasswordChangeView.as_view(), name="password_change"),
     path("auth/password-reset/", views.PasswordResetRequestView.as_view(), name="password_reset"),
     path(
         "auth/password-reset-confirm/",

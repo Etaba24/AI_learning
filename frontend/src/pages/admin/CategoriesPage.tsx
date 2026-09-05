@@ -1,11 +1,13 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
-import type { Category, PaginatedResponse } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, type Category, type PaginatedResponse } from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { useConfirm } from '../../components/ConfirmContext'
 import { Modal } from '../../components/Modal'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 interface FormState {
   id: string | null
@@ -20,6 +22,8 @@ export function CategoriesPage() {
   const confirm = useConfirm()
 
   const [categories, setCategories] = useState<Category[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -28,12 +32,16 @@ export function CategoriesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function loadCategories() {
-    apiFetch<PaginatedResponse<Category>>('/categories/')
-      .then((data) => setCategories(data.results))
+    apiFetch<PaginatedResponse<Category>>(`/categories/?page=${page}`)
+      .then((data) => {
+        setCategories(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
-  useEffect(loadCategories, [])
+  useEffect(loadCategories, [page])
+  useRealtimeTopics(['admin_categories'], loadCategories)
 
   function openCreateModal() {
     setForm(EMPTY_FORM)
@@ -100,7 +108,7 @@ export function CategoriesPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-          Catégories {categories ? `(${categories.length})` : ''}
+          Catégories {categories ? `(${count})` : ''}
         </h1>
         <button
           onClick={openCreateModal}
@@ -173,6 +181,9 @@ export function CategoriesPage() {
               Aucune catégorie pour l'instant. Cliquez sur "Nouvelle catégorie" pour en créer une.
             </div>
           )}
+          <div className="px-6 py-4">
+            <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
+          </div>
         </div>
       )}
 

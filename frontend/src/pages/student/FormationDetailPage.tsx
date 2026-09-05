@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Clock,
   Award,
+  Eye,
   Lock,
   Play,
   PlayCircle,
@@ -15,11 +16,17 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import { NIVEAU_LABELS, type Inscription, type PaginatedResponse, type PublicFormationDetail } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
 import { Alert } from '../../components/Alert'
 import { InteractiveLessonViewer } from '../../components/InteractiveLessonViewer'
 
 export function FormationDetailPage() {
   const { id } = useParams()
+  const { user } = useAuth()
+  // Un formateur (ou un admin) consulte une formation pour la relire/gérer,
+  // jamais pour la "suivre" — il ne doit jamais avoir besoin de s'inscrire
+  // pour en lire le contenu, contrairement à un apprenant.
+  const isPreviewOnly = user?.role === 'INSTRUCTOR' || user?.role === 'ADMIN'
   const [searchParams, setSearchParams] = useSearchParams()
   const targetModuleId = searchParams.get('module')
   const targetLeconId = searchParams.get('lecon')
@@ -53,6 +60,10 @@ export function FormationDetailPage() {
   }, [id, targetLeconId, targetModuleId])
 
   const existingInscription = inscriptions?.find((inscription) => inscription.formation === id)
+  // Débloque l'accès au contenu sans jamais passer par une inscription pour
+  // un formateur/admin — l'inscription reste le seul déclencheur pour un
+  // véritable apprenant.
+  const canAccessContent = Boolean(existingInscription) || isPreviewOnly
 
   useEffect(() => {
     if (formation && existingInscription) {
@@ -105,6 +116,18 @@ export function FormationDetailPage() {
   const currentLeconIndex = currentModule && currentLecon
     ? currentModule.lecons.findIndex((l) => l.id === currentLecon.id)
     : 0
+
+  function goToFirstLesson() {
+    if (!formation) return
+    if (formation.modules.length > 0) {
+      const firstMod = formation.modules[0]
+      setSelectedModuleId(firstMod.id)
+      if (firstMod.lecons.length > 0) {
+        setActiveLeconId(firstMod.lecons[0].id)
+      }
+    }
+    window.scrollTo({ top: 350, behavior: 'smooth' })
+  }
 
   function handleCompleteAndNextLesson() {
     if (!currentLecon || !formation) return
@@ -247,20 +270,19 @@ export function FormationDetailPage() {
 
             {existingInscription ? (
               <button
-                onClick={() => {
-                  if (formation.modules.length > 0) {
-                    const firstMod = formation.modules[0]
-                    setSelectedModuleId(firstMod.id)
-                    if (firstMod.lecons.length > 0) {
-                      setActiveLeconId(firstMod.lecons[0].id)
-                    }
-                  }
-                  window.scrollTo({ top: 350, behavior: 'smooth' })
-                }}
+                onClick={goToFirstLesson}
                 className="flex items-center gap-2 rounded-2xl bg-sky-400 px-6 py-3 text-xs font-extrabold text-white shadow-lg shadow-sky-400/30 hover:bg-sky-500 active:scale-95 transition-all"
               >
                 <Play size={16} fill="currentColor" />
                 <span>Continuer le cours</span>
+              </button>
+            ) : isPreviewOnly ? (
+              <button
+                onClick={goToFirstLesson}
+                className="flex items-center gap-2 rounded-2xl bg-sky-400 px-6 py-3 text-xs font-extrabold text-white shadow-lg shadow-sky-400/30 hover:bg-sky-500 active:scale-95 transition-all"
+              >
+                <Eye size={16} />
+                <span>Consulter le contenu</span>
               </button>
             ) : (
               <button
@@ -287,7 +309,7 @@ export function FormationDetailPage() {
       {/* ZONE DE CONTENU PRINCIPAL PLEINE LARGEUR */}
       <div className="w-full space-y-6">
         {/* NIVEAU 3 : APPRÉNANT A CLIQUÉ SUR UNE LEÇON -> APPAREIL CONTINU (VIDÉO -> COURS -> PDF -> EXERCICES) */}
-        {existingInscription && currentLecon ? (
+        {canAccessContent && currentLecon ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <button
@@ -325,7 +347,7 @@ export function FormationDetailPage() {
             />
           </div>
         ) : /* NIVEAU 2 : APPRÉNANT A CLIQUÉ SUR UN MODULE -> LISTE DES LEÇONS SELON LE MODÈLE EXACT DE LA CAPTURE D'ÉCRAN */
-        existingInscription && currentModule ? (
+        canAccessContent && currentModule ? (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <button
@@ -359,7 +381,7 @@ export function FormationDetailPage() {
                     const isDone = completedLessonIds.includes(lecon.id)
                     const isSelected = lecon.id === activeLeconId
                     const isPreviousDone = lIdx === 0 || completedLessonIds.includes(currentModule.lecons[lIdx - 1].id)
-                    const isUnlocked = isDone || isSelected || isPreviousDone
+                    const isUnlocked = isPreviewOnly || isDone || isSelected || isPreviousDone
 
                     return (
                       <div key={lecon.id} className="relative group">
@@ -488,7 +510,7 @@ export function FormationDetailPage() {
                   const completedCountInMod = module.lecons.filter((l) => completedLessonIds.includes(l.id)).length
                   const isModCompleted = module.lecons.length > 0 && completedCountInMod === module.lecons.length
                   const isPreviousModCompleted = mIdx === 0 || (formation.modules[mIdx - 1].lecons.length > 0 && formation.modules[mIdx - 1].lecons.every((l) => completedLessonIds.includes(l.id)))
-                  const isModUnlocked = !existingInscription || mIdx === 0 || isModCompleted || isPreviousModCompleted
+                  const isModUnlocked = isPreviewOnly || !existingInscription || mIdx === 0 || isModCompleted || isPreviousModCompleted
 
                   return (
                     <div key={module.id} className="relative group">
@@ -514,7 +536,7 @@ export function FormationDetailPage() {
                       {/* CARTE DE MODULE CONFORME AU MODÈLE DE LA CAPTURE D'ÉCRAN */}
                       <div
                         onClick={() => {
-                          if (existingInscription && isModUnlocked) {
+                          if (canAccessContent && isModUnlocked) {
                             setSelectedModuleId(module.id)
                             setActiveLeconId(null)
                             setSearchParams({ module: module.id })
@@ -565,7 +587,7 @@ export function FormationDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          {existingInscription && isModUnlocked ? (
+                          {canAccessContent && isModUnlocked ? (
                             <button className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700">
                               <span>Voir les leçons</span>
                               <ChevronRight size={16} />

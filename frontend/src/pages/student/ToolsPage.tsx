@@ -2,14 +2,18 @@ import {
   Boxes,
   Calculator,
   Code2,
+  Crown,
   FileSpreadsheet,
   NotebookPen,
   PenTool,
   Sparkles,
   Wrench,
 } from 'lucide-react'
-import type { ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { Link } from 'react-router-dom'
+import { apiFetch } from '../../api/client'
+import type { MonAbonnement } from '../../api/types'
+import { PremiumOffersModal } from '../../components/PremiumOffersModal'
 
 interface ToolItem {
   icon: ComponentType<{ size?: number; className?: string }>
@@ -76,7 +80,15 @@ const SPECIALIZED_TOOLS: ToolItem[] = [
   },
 ]
 
-function ToolCard({ tool }: { tool: ToolItem }) {
+function ToolCard({
+  tool,
+  isSubscribed,
+  onLockedClick,
+}: {
+  tool: ToolItem
+  isSubscribed: boolean
+  onLockedClick: () => void
+}) {
   const Icon = tool.icon
   const isAvailable = Boolean(tool.to)
 
@@ -87,7 +99,12 @@ function ToolCard({ tool }: { tool: ToolItem }) {
           <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isAvailable ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
             <Icon size={20} />
           </div>
-          {isAvailable ? (
+          {isAvailable && !isSubscribed ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+              <Crown size={10} />
+              Premium
+            </span>
+          ) : isAvailable ? (
             <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
               Disponible
             </span>
@@ -111,6 +128,15 @@ function ToolCard({ tool }: { tool: ToolItem }) {
   const cardClasses =
     'flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-sky-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500/30'
 
+  // Sans abonnement, le clic ouvre le popup des formules sur place —
+  // aucune redirection vers une autre page.
+  if (tool.to && !isSubscribed) {
+    return (
+      <button onClick={onLockedClick} className={`${cardClasses} text-left`}>
+        {content}
+      </button>
+    )
+  }
   if (tool.to) {
     return (
       <Link to={tool.to} className={cardClasses}>
@@ -122,6 +148,15 @@ function ToolCard({ tool }: { tool: ToolItem }) {
 }
 
 export function ToolsPage() {
+  const [isSubscribed, setIsSubscribed] = useState(true)
+  const [showOffers, setShowOffers] = useState(false)
+
+  useEffect(() => {
+    apiFetch<MonAbonnement>('/mon-abonnement/')
+      .then((abonnement) => setIsSubscribed(abonnement.actif))
+      .catch(() => setIsSubscribed(false))
+  }, [])
+
   return (
     <div className="space-y-8">
       <div className="relative overflow-hidden rounded-3xl border border-sky-200/50 bg-gradient-to-br from-slate-900 via-sky-900 to-indigo-900 p-6 text-white shadow-xl shadow-sky-500/10 sm:p-8 dark:border-sky-500/20">
@@ -151,7 +186,7 @@ export function ToolsPage() {
         </h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {UNIVERSAL_TOOLS.map((tool) => (
-            <ToolCard key={tool.name} tool={tool} />
+            <ToolCard key={tool.name} tool={tool} isSubscribed={isSubscribed} onLockedClick={() => setShowOffers(true)} />
           ))}
         </div>
       </div>
@@ -163,10 +198,12 @@ export function ToolsPage() {
         </h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {SPECIALIZED_TOOLS.map((tool) => (
-            <ToolCard key={tool.name} tool={tool} />
+            <ToolCard key={tool.name} tool={tool} isSubscribed={isSubscribed} onLockedClick={() => setShowOffers(true)} />
           ))}
         </div>
       </div>
+
+      <PremiumOffersModal open={showOffers} onClose={() => setShowOffers(false)} />
     </div>
   )
 }

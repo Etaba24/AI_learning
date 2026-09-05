@@ -1,6 +1,8 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
+from billing.permissions import HasActiveSubscription
+
 from core.utils import log_activity
 
 from .models import Tableau
@@ -11,7 +13,7 @@ class TableauListCreateView(generics.ListCreateAPIView):
     """GET /api/tableaux/ (liste, sans scène) — POST /api/tableaux/.
     Chacun ne voit et ne manipule que ses propres tableaux."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_serializer_class(self):
         if self.request.method == "GET":
@@ -30,7 +32,7 @@ class TableauDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PATCH/DELETE /api/tableaux/<uuid>/ — restreint au propriétaire."""
 
     serializer_class = TableauSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_queryset(self):
         return Tableau.objects.filter(proprietaire=self.request.user)

@@ -17,6 +17,62 @@ body {
   margin: 0;
 }
 
+html.dark {
+  color-scheme: dark;
+  background-color: #020817;
+}
+
+html.dark body {
+  background: #020817;
+  color: #e2e8f0;
+}
+
+html.dark .bg-white,
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-slate-200,
+html.dark .bg-slate-300,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/80,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90,
+html.dark .bg-slate-100\/80 {
+  background-color: #0f172a !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-slate-700,
+html.dark .border-slate-800 {
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+html.dark .text-slate-950,
+html.dark .text-slate-900 { color: #f8fafc !important; }
+html.dark .text-slate-800 { color: #e2e8f0 !important; }
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-slate-300 { color: #cbd5e1 !important; }
+html.dark .text-slate-200 { color: #e2e8f0 !important; }
+html.dark .text-slate-100 { color: #f8fafc !important; }
+
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-slate-300,
+html.dark .text-slate-200,
+html.dark .text-slate-100 {
+  transition: color 0.2s ease;
+}
+
 /* Bandeau défilant de HomePage.tsx (id #vision) */
 @keyframes marquee {
   from {

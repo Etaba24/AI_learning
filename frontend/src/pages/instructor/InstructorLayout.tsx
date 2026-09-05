@@ -5,7 +5,9 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Settings,
   Menu,
+  MessageSquare,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,48 +22,53 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ROLE_LABELS } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { useConfirm } from '../../components/ConfirmContext'
 import { useTheme } from '../../theme/ThemeContext'
 
-const INSTRUCTOR_NAV_GROUPS = [
-  {
-    label: 'Tableau de bord',
-    items: [{ to: '/formateur', label: 'Vue Synthétique', icon: LayoutDashboard, end: true }],
-  },
-  {
-    label: 'Espace Pédagogique',
-    items: [
-      { to: '/formateur/mes-formations', label: 'Mes Formations', icon: BookOpen, end: false },
-      { to: '/formateur/creer-formation', label: 'Créer un cours', icon: PlusCircle, end: false },
-      { to: '/formateur/evaluations', label: 'Quiz & Évaluations', icon: Award, end: false },
-    ],
-  },
-  {
-    label: 'Suivi & Ressources',
-    items: [
-      { to: '/formateur/apprenants', label: 'Mes Apprenants', icon: Users, end: false },
-      { to: '/formateur/bibliotheque', label: 'Bibliothèque & Supports', icon: UploadCloud, end: false },
-    ],
-  },
-]
-
-const INSTRUCTOR_PAGE_TITLES: Record<string, { category: string; title: string; subtitle: string }> = {
-  '/formateur': { category: 'Pilotage', title: 'Tableau de bord Formateur', subtitle: 'Suivi global de vos cours, inscrits et indicateurs pédagogiques.' },
-  '/formateur/mes-formations': { category: 'Espace Pédagogique', title: 'Mes Formations', subtitle: 'Gérez le statut, les modules et les leçons de vos cours.' },
-  '/formateur/creer-formation': { category: 'Espace Pédagogique', title: 'Créer une nouvelle formation', subtitle: 'Concevez votre programme et soumettez-le à la modération.' },
-  '/formateur/evaluations': { category: 'Espace Pédagogique', title: 'Quiz & Évaluations', subtitle: 'Consultez les résultats de vos apprenants aux exercices.' },
-  '/formateur/apprenants': { category: 'Suivi & Ressources', title: 'Suivi des Apprenants', subtitle: 'Analysez l’avancement individuel et communiquez avec vos élèves.' },
-  '/formateur/bibliotheque': { category: 'Suivi & Ressources', title: 'Bibliothèque & Supports', subtitle: 'Publiez des documents PDF/EPUB avec couverture automatique 3D.' },
-}
-
 export function InstructorLayout() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
   const confirm = useConfirm()
+
+  const INSTRUCTOR_NAV_GROUPS = [
+    {
+      label: t('instructor.nav.dashboardGroup'),
+      items: [{ to: '/formateur', label: t('instructor.nav.dashboard'), icon: LayoutDashboard, end: true }],
+    },
+    {
+      label: t('instructor.nav.pedagogy'),
+      items: [
+        { to: '/formateur/mes-formations', label: t('instructor.nav.mesFormations'), icon: BookOpen, end: false },
+        { to: '/formateur/creer-formation', label: t('instructor.nav.creerFormation'), icon: PlusCircle, end: false },
+        { to: '/formateur/evaluations', label: t('instructor.nav.evaluations'), icon: Award, end: false },
+      ],
+    },
+    {
+      label: t('instructor.nav.suivi'),
+      items: [
+        { to: '/formateur/apprenants', label: t('instructor.nav.apprenants'), icon: Users, end: false },
+        { to: '/formateur/messagerie', label: t('instructor.nav.messagerie'), icon: MessageSquare, end: false },
+        { to: '/formateur/bibliotheque', label: t('instructor.nav.bibliotheque'), icon: UploadCloud, end: false },
+      ],
+    },
+  ]
+
+  const INSTRUCTOR_PAGE_TITLES: Record<string, { category: string; title: string; subtitle: string }> = {
+    '/formateur': { category: t('instructor.nav.dashboardGroup'), ...(t('instructor.pageTitles.dashboard', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/mes-formations': { category: t('instructor.nav.pedagogy'), ...(t('instructor.pageTitles.mesFormations', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/creer-formation': { category: t('instructor.nav.pedagogy'), ...(t('instructor.pageTitles.creerFormation', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/evaluations': { category: t('instructor.nav.pedagogy'), ...(t('instructor.pageTitles.evaluations', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/apprenants': { category: t('instructor.nav.suivi'), ...(t('instructor.pageTitles.apprenants', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/messagerie': { category: t('instructor.nav.suivi'), ...(t('instructor.pageTitles.messagerie', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/bibliotheque': { category: t('instructor.nav.suivi'), ...(t('instructor.pageTitles.bibliotheque', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/formateur/parametres': { category: t('instructor.accountCategory'), ...(t('instructor.pageTitles.parametres', { returnObjects: true }) as { title: string; subtitle: string }) },
+  }
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -86,20 +93,16 @@ export function InstructorLayout() {
   }, [])
 
   const initial = (user?.first_name || user?.email || '?').charAt(0).toUpperCase()
-  const userName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email.split('@')[0] : 'Formateur'
+  const userName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email.split('@')[0] : t('instructor.roleFallback')
   const userFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || userName
 
-  const currentPageInfo = INSTRUCTOR_PAGE_TITLES[location.pathname] || {
-    category: 'Espace Formateur',
-    title: 'Console Pédagogique',
-    subtitle: 'Espace de gestion des cours et supports d’apprentissage.',
-  }
+  const currentPageInfo = INSTRUCTOR_PAGE_TITLES[location.pathname] || (t('instructor.fallbackPage', { returnObjects: true }) as { category: string; title: string; subtitle: string })
 
   async function handleLogoutClick() {
     const ok = await confirm({
-      title: 'Se déconnecter ?',
-      message: 'Êtes-vous sûr de vouloir fermer votre session formateur ?',
-      confirmLabel: 'Déconnexion',
+      title: t('instructor.logoutConfirm.title'),
+      message: t('instructor.logoutConfirm.message'),
+      confirmLabel: t('instructor.logoutConfirm.confirmLabel'),
       variant: 'warning',
     })
     if (ok) {
@@ -134,7 +137,7 @@ export function InstructorLayout() {
                   AI Learning
                 </span>
                 <span className="block text-[10px] font-bold tracking-wider text-indigo-600 uppercase dark:text-indigo-400">
-                  Espace Formateur
+                  {t('instructor.workspaceLabel')}
                 </span>
               </div>
             )}
@@ -183,16 +186,35 @@ export function InstructorLayout() {
           ))}
         </nav>
 
-        {/* COLLAPSE SIDEBAR */}
+        {/* PIED DE SIDEBAR : PROFIL */}
         <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="hidden w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 md:flex dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800"
-            title={isSidebarCollapsed ? 'Agrandir le menu' : 'Réduire le menu'}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            {!isSidebarCollapsed && <span>Réduire la barre</span>}
-          </button>
+          <div className={`flex items-center gap-2.5 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 text-xs font-bold text-white">
+              {initial}
+            </div>
+            {!isSidebarCollapsed && (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">{userName}</p>
+                  <p className="truncate text-[10px] text-slate-400">{user?.email}</p>
+                </div>
+                <NavLink
+                  to="/formateur/parametres"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  aria-label={t('instructor.sidebarFooter.settingsAria')}
+                >
+                  <Settings size={14} />
+                </NavLink>
+                <button
+                  onClick={handleLogoutClick}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                  aria-label={t('instructor.sidebarFooter.logoutAria')}
+                >
+                  <LogOut size={14} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </aside>
 
@@ -236,7 +258,7 @@ export function InstructorLayout() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une de vos leçons, un élève..."
+                placeholder={t('instructor.searchPlaceholder')}
                 className="w-full rounded-2xl border border-slate-200/90 bg-slate-50/90 py-2 pl-9 pr-10 text-xs font-medium text-slate-900 placeholder-slate-400 transition-all focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-100 dark:placeholder-slate-500"
               />
               {searchQuery && (
@@ -255,7 +277,7 @@ export function InstructorLayout() {
             <button
               onClick={toggleTheme}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+              title={theme === 'dark' ? t('instructor.themeLight') : t('instructor.themeDark')}
             >
               {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-slate-600" />}
             </button>
@@ -273,28 +295,28 @@ export function InstructorLayout() {
               {showNotifications && (
                 <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl animate-[popup-in_0.25s_cubic-bezier(0.16,1,0.3,1)] dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">Notifications Formateur</h3>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">{t('instructor.notifTitle')}</h3>
                     <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
-                      2 récentes
+                      {t('instructor.notif2Recent')}
                     </span>
                   </div>
 
                   <div className="space-y-2 py-3">
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-900/30 dark:bg-emerald-500/10">
                       <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                        Nouveau suivi d'apprenant
+                        {t('instructor.notifItem1Title')}
                       </p>
                       <p className="mt-0.5 text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
-                        3 nouveaux apprenants ont rejoint votre cours React & TypeScript.
+                        {t('instructor.notifItem1Body')}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/30 dark:bg-indigo-500/10">
                       <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
-                        Formation Validée
+                        {t('instructor.notifItem2Title')}
                       </p>
                       <p className="mt-0.5 text-[11px] text-indigo-800/80 dark:text-indigo-300/80">
-                        Votre cours a été validé par l'administration et est publié.
+                        {t('instructor.notifItem2Body')}
                       </p>
                     </div>
                   </div>
@@ -316,7 +338,7 @@ export function InstructorLayout() {
                 <div className="hidden text-left sm:block">
                   <p className="text-xs font-bold leading-tight text-slate-900 dark:text-slate-100">{userName}</p>
                   <p className="text-[10px] font-medium leading-none text-slate-400">
-                    {user ? ROLE_LABELS[user.role] : 'Formateur'}
+                    {user ? ROLE_LABELS[user.role] : t('instructor.roleFallback')}
                   </p>
                 </div>
                 <ChevronDown size={14} className="text-slate-400" />
@@ -336,7 +358,7 @@ export function InstructorLayout() {
                     </div>
                     <div className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
                       <Sparkles size={11} />
-                      Formateur Enseignant
+                      {t('instructor.profileBadge')}
                     </div>
                   </div>
 
@@ -347,7 +369,15 @@ export function InstructorLayout() {
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       <User size={15} className="text-slate-400" />
-                      Gérer mes formations
+                      {t('instructor.profileMenuLink1')}
+                    </NavLink>
+                    <NavLink
+                      to="/formateur/parametres"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <Settings size={15} className="text-slate-400" />
+                      {t('instructor.profileMenuLink2')}
                     </NavLink>
                   </div>
 
@@ -360,7 +390,7 @@ export function InstructorLayout() {
                       className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
                     >
                       <LogOut size={15} />
-                      Se déconnecter
+                      {t('instructor.logout')}
                     </button>
                   </div>
                 </div>

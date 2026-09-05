@@ -1,6 +1,8 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
+from billing.permissions import HasActiveSubscription
+
 from core.utils import log_activity
 
 from .models import Scene3D
@@ -11,7 +13,7 @@ class Scene3DListCreateView(generics.ListCreateAPIView):
     """GET /api/scenes3d/ (liste, sans objets) — POST /api/scenes3d/.
     Chacun ne voit et ne manipule que ses propres scènes."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_serializer_class(self):
         if self.request.method == "GET":
@@ -30,7 +32,7 @@ class Scene3DDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PATCH/DELETE /api/scenes3d/<uuid>/ — restreint au propriétaire."""
 
     serializer_class = Scene3DSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_queryset(self):
         return Scene3D.objects.filter(proprietaire=self.request.user)

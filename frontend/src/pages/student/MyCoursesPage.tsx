@@ -2,8 +2,10 @@ import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, PlayCircle, Sparkles
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
-import { NIVEAU_LABELS, type Inscription, type PaginatedResponse } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type Inscription, type PaginatedResponse } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { Pagination } from '../../components/Pagination'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 const STATUT_LABELS: Record<Inscription['statut'], string> = {
   EN_COURS: 'En cours',
@@ -19,13 +21,21 @@ const STATUT_STYLES: Record<Inscription['statut'], string> = {
 
 export function MyCoursesPage() {
   const [inscriptions, setInscriptions] = useState<Inscription[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
-      .then((data) => setInscriptions(data.results))
+  function loadInscriptions() {
+    apiFetch<PaginatedResponse<Inscription>>(`/inscriptions/?page=${page}`)
+      .then((data) => {
+        setInscriptions(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
-  }, [])
+  }
+
+  useEffect(loadInscriptions, [page])
+  useRealtimeTopics(['mes_formations'], loadInscriptions)
 
   if (error) {
     return <Alert variant="error" message={error} />
@@ -149,6 +159,10 @@ export function MyCoursesPage() {
             </Link>
           ))}
         </div>
+      )}
+
+      {inscriptions.length > 0 && (
+        <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       )}
     </div>
   )

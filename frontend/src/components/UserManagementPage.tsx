@@ -1,11 +1,13 @@
 import { Plus, UserX, UserCheck, Pencil, Trash2, Eye, EyeOff } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../api/client'
-import type { Departement, PaginatedResponse, Role, User } from '../api/types'
+import { DEFAULT_PAGE_SIZE, type Departement, type PaginatedResponse, type Role, type User } from '../api/types'
 import { Alert } from './Alert'
 import { useConfirm } from './ConfirmContext'
 import { Modal } from './Modal'
+import { Pagination } from './Pagination'
 import { useToast } from './ToastContext'
+import { useRealtimeTopics } from '../hooks/useRealtimeTopics'
 
 interface UserManagementPageProps {
   role: Role
@@ -32,6 +34,8 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
   const confirm = useConfirm()
 
   const [users, setUsers] = useState<User[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [departements, setDepartements] = useState<Departement[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -42,12 +46,17 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function loadUsers() {
-    apiFetch<PaginatedResponse<User>>(`/users/?role=${role}`)
-      .then((data) => setUsers(data.results))
+    apiFetch<PaginatedResponse<User>>(`/users/?role=${role}&page=${page}`)
+      .then((data) => {
+        setUsers(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
-  useEffect(loadUsers, [role])
+  useEffect(loadUsers, [role, page])
+  useEffect(() => setPage(1), [role])
+  useRealtimeTopics(['admin_users'], loadUsers)
 
   useEffect(() => {
     if (!requireDepartement) return
@@ -158,7 +167,7 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-          {title} {users ? `(${users.length})` : ''}
+          {title} {users ? `(${count})` : ''}
         </h1>
         <button
           onClick={openCreateModal}
@@ -289,6 +298,9 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="px-6 py-4">
+            <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
           </div>
         </div>
       )}

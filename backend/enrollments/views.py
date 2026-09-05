@@ -20,6 +20,18 @@ class InscriptionListCreateView(generics.ListCreateAPIView):
         return Inscription.objects.filter(apprenant=self.request.user).select_related("formation")
 
     def perform_create(self, serializer):
+        # Le « videur » : une formation premium exige un abonnement actif
+        # (personnel ou via l'établissement du compte). Contrôle côté
+        # serveur — masquer un bouton au frontend ne protège rien.
+        formation = serializer.validated_data.get("formation")
+        if formation and formation.est_premium:
+            from billing.services import a_acces_premium
+            from rest_framework.exceptions import PermissionDenied
+
+            if not a_acces_premium(self.request.user):
+                raise PermissionDenied(
+                    "Cette formation est réservée aux abonnés. Souscrivez un abonnement pour y accéder."
+                )
         serializer.save(apprenant=self.request.user)
 
 

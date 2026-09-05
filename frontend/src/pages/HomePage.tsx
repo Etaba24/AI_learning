@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { href: '#apropos', label: 'À propos' },
   { href: '#formations', label: 'Nos formations' },
   { href: '#services', label: 'Nos services' },
+  { href: '/abonnements', label: 'Abonnements' },
   { href: '#roles', label: 'Espaces' },
   { href: '#temoignages', label: 'Témoignages' },
   { href: '#contact', label: 'Nous contacter' },
@@ -188,16 +189,26 @@ export function HomePage() {
             <span className="text-xl font-extrabold tracking-tight text-sky-700">AI Learning</span>
           </div>
           <nav className="hidden items-center space-x-8 text-sm font-medium text-slate-500 md:flex">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => handleNavClick(e, link.href)}
-                className="transition-colors hover:text-sky-900 cursor-pointer"
-              >
-                {link.label}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) =>
+              link.href.startsWith('/') ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="transition-colors hover:text-sky-900 cursor-pointer"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
+                  className="transition-colors hover:text-sky-900 cursor-pointer"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
@@ -224,16 +235,27 @@ export function HomePage() {
 
         {isMenuOpen && (
           <nav className="flex flex-col gap-1 border-t border-slate-100 bg-white px-4 py-3 text-sm font-medium text-slate-600 md:hidden">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => handleNavClick(e, link.href)}
-                className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer"
-              >
-                {link.label}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) =>
+              link.href.startsWith('/') ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
+                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </nav>
         )}
       </header>
@@ -246,7 +268,7 @@ export function HomePage() {
               Plateforme e-learning nouvelle génération
             </div>
             <h1 className="mb-6 text-4xl leading-[1.15] font-extrabold tracking-tight text-sky-700 sm:text-5xl">
-              Apprenez, pratiquez, progressez — accompagné par un tuteur IA
+              Apprenez, pratiquez, progressez  accompagné par un tuteur IA
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-slate-600 lg:mx-0">
               AI Learning combine des formations structurées, des exercices pratiques et un

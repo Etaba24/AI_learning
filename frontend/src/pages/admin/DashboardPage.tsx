@@ -22,6 +22,7 @@ import { apiFetch, ApiError } from '../../api/client'
 import type { Formation, PaginatedResponse, User } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert } from '../../components/Alert'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 interface AdminStats {
   users: { total: number; students: number; instructors: number; admins: number }
@@ -42,12 +43,10 @@ export function DashboardPage() {
   const [recentFormations, setRecentFormations] = useState<Formation[]>([])
   const [recentUsers, setRecentUsers] = useState<User[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const userName = user?.first_name || user?.email?.split('@')[0] || 'Administrateur'
 
   function loadDashboardData() {
-    setIsRefreshing(true)
     setError(null)
     Promise.all([
       apiFetch<AdminStats>('/admin/stats/'),
@@ -60,12 +59,16 @@ export function DashboardPage() {
         setRecentUsers(usersData.results.slice(0, 5))
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des données.'))
-      .finally(() => setIsRefreshing(false))
   }
 
   useEffect(() => {
     loadDashboardData()
   }, [])
+
+  // Remplace le bouton "Actualiser" : la moindre inscription, formation
+  // créée/modifiée/supprimée par quiconque (n'importe quel admin/formateur,
+  // n'importe où dans l'appli) re-synchronise ce tableau de bord tout seul.
+  useRealtimeTopics(['admin_dashboard'], loadDashboardData)
 
   if (error) {
     return (
@@ -130,18 +133,8 @@ export function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={loadDashboardData}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2.5 text-xs font-semibold text-slate-200 shadow-sm backdrop-blur-md transition-all hover:bg-slate-700 active:scale-95 disabled:opacity-50"
-              title="Rafraîchir les statistiques"
-            >
-              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-sky-400' : ''} />
-              {isRefreshing ? 'Actualisation...' : 'Actualiser'}
-            </button>
-
             <Link
-              to="/admin/formations/new"
+              to="/admin/creer-formation"
               className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 transition-all hover:from-sky-600 hover:to-indigo-700 active:scale-95"
             >
               <Plus size={15} />

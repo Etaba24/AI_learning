@@ -1,7 +1,9 @@
 import { ArrowLeft, Loader2, PenTool, Plus, Save, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
+import { DEFAULT_PAGE_SIZE } from '../../api/types'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
 import { useTheme } from '../../theme/ThemeContext'
 import '@excalidraw/excalidraw/index.css'
@@ -34,6 +36,8 @@ export function TableauBlancPage() {
   const { showToast } = useToast()
 
   const [tableaux, setTableaux] = useState<TableauSummary[] | null>(null)
+  const [tableauxCount, setTableauxCount] = useState(0)
+  const [tableauxPage, setTableauxPage] = useState(1)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [openTableau, setOpenTableau] = useState<TableauDetail | null>(null)
@@ -47,13 +51,14 @@ export function TableauBlancPage() {
   const elementsRef = useRef<readonly object[]>([])
   const isReadyRef = useRef(false)
 
-  useEffect(() => {
-    refreshList()
-  }, [])
+  useEffect(refreshList, [tableauxPage])
 
   function refreshList() {
-    apiFetch<PaginatedResponse<TableauSummary>>('/tableaux/')
-      .then((res) => setTableaux(res.results))
+    apiFetch<PaginatedResponse<TableauSummary>>(`/tableaux/?page=${tableauxPage}`)
+      .then((res) => {
+        setTableaux(res.results)
+        setTableauxCount(res.count)
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
@@ -230,7 +235,7 @@ export function TableauBlancPage() {
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
           <PenTool size={18} className="text-sky-500" />
-          Mes tableaux ({tableaux.length})
+          Mes tableaux ({tableauxCount})
         </h2>
         <button
           onClick={handleCreate}
@@ -278,6 +283,10 @@ export function TableauBlancPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {tableaux.length > 0 && (
+        <Pagination count={tableauxCount} page={tableauxPage} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setTableauxPage} />
       )}
     </div>
   )

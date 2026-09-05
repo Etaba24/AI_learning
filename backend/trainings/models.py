@@ -43,6 +43,9 @@ class Formation(TimeStampedModel):
     prerequis = models.TextField(blank=True)
     niveau = models.CharField(max_length=20, choices=Niveau.choices, default=Niveau.DEBUTANT)
     duree_heures = models.PositiveIntegerField(help_text="Durée estimée, en heures")
+    # Monétisation : False = accessible à tous, True = réservé aux abonnés
+    # (contrôlé à l'inscription par billing.services — le « videur »).
+    est_premium = models.BooleanField(default=False)
     categorie = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="formations")
     # Obligatoire côté API (FormationSerializer), nullable en base pour ne
     # pas bloquer sur une migration interactive : un formateur ne peut

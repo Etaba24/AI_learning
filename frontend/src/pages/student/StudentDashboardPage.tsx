@@ -19,6 +19,7 @@ import { apiFetch, ApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
 import { NIVEAU_LABELS, type Inscription, type PaginatedResponse, type PublicFormation, type PublicFormationDetail } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 import { RecommendedPathStepper } from '../../components/RecommendedPathStepper'
 
 export function StudentDashboardPage() {
@@ -31,8 +32,7 @@ export function StudentDashboardPage() {
   const [showLessonBreakdown, setShowLessonBreakdown] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Charger les inscriptions de l'apprenant
+  function loadInscriptions() {
     apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
       .then((data) => {
         setInscriptions(data.results)
@@ -45,12 +45,21 @@ export function StudentDashboardPage() {
         }
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des cours.'))
+  }
 
-    // Charger les cours du catalogue
+  function loadCatalogue() {
     apiFetch<PaginatedResponse<PublicFormation>>('/catalogue/formations/')
       .then((data) => setCatalogue(data.results.slice(0, 3)))
       .catch(() => setCatalogue([]))
+  }
+
+  useEffect(() => {
+    loadInscriptions()
+    loadCatalogue()
   }, [])
+
+  useRealtimeTopics(['mes_formations'], loadInscriptions)
+  useRealtimeTopics(['catalogue'], loadCatalogue)
 
   if (error) {
     return <Alert variant="error" message={error} />

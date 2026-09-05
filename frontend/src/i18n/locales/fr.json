@@ -1,0 +1,488 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "loading": "Chargement...",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "pagination": {
+      "previousAria": "Page précédente",
+      "nextAria": "Page suivante",
+      "pageIndicator": "Page {{page}} / {{totalPages}}",
+      "range": "{{from}}–{{to}} sur {{count}}"
+    }
+  },
+  "confirm": {
+    "badge": {
+      "danger": "Action irréversible",
+      "warning": "Attention requise",
+      "info": "Confirmation",
+      "success": "Validation"
+    },
+    "cancelLabel": "Annuler",
+    "deleteLabel": "Supprimer",
+    "confirmLabel": "Confirmer",
+    "closeAria": "Fermer"
+  },
+  "toast": {
+    "title": {
+      "success": "Succès",
+      "error": "Erreur",
+      "warning": "Attention",
+      "info": "Information"
+    },
+    "closeAria": "Fermer la notification"
+  },
+  "auth": {
+    "backHome": "← AI Learning",
+    "loginPanel": {
+      "title": "Bon retour !",
+      "subtitle": "Vous avez déjà un compte ? Connectez-vous pour reprendre votre parcours.",
+      "cta": "Se connecter"
+    },
+    "registerPanel": {
+      "title": "Bienvenue !",
+      "subtitle": "Nouveau sur AI Learning ? Créez votre compte apprenant en quelques secondes.",
+      "cta": "S'inscrire"
+    },
+    "formTitle": {
+      "login": "Connexion",
+      "register": "Créer un compte"
+    },
+    "fullNameLabel": "Nom complet",
+    "fullNamePlaceholder": "ex : Jean Dupont",
+    "emailLabel": "Email",
+    "emailPlaceholder": "nom@exemple.com",
+    "passwordLabel": "Mot de passe",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "submitting": "Un instant...",
+    "submit": {
+      "login": "Se connecter",
+      "register": "S'inscrire"
+    },
+    "genericError": "Impossible de contacter le serveur.",
+    "orDivider": "ou",
+    "googleUnavailable": "Connexion Google indisponible pour le moment",
+    "googleError": "La connexion avec Google a échoué. Réessayez.",
+    "verify": {
+      "title": "Vérifiez votre email",
+      "subtitle": "Un code à 4 chiffres a été envoyé à {{email}}. Saisissez-le pour créer votre compte.",
+      "codeLabel": "Code de vérification",
+      "submit": "Confirmer et créer mon compte",
+      "back": "← Utiliser un autre moyen de connexion",
+      "genericError": "Code invalide, réessayez."
+    },
+    "forgotLink": "Mot de passe oublié ?",
+    "forgot": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Indiquez votre email : si un compte existe, un lien de réinitialisation vous sera envoyé.",
+      "submit": "Envoyer le lien",
+      "success": "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
+      "back": "← Retour à la connexion",
+      "genericError": "Impossible de contacter le serveur."
+    }
+  },
+  "resetPassword": {
+    "title": "Nouveau mot de passe",
+    "subtitle": "Choisissez un nouveau mot de passe pour votre compte.",
+    "newPasswordLabel": "Nouveau mot de passe",
+    "confirmPasswordLabel": "Confirmer",
+    "submit": "Réinitialiser le mot de passe",
+    "success": "Votre mot de passe a été mis à jour. Vous pouvez maintenant vous connecter.",
+    "backToLogin": "Aller à la connexion",
+    "mismatch": "La confirmation ne correspond pas au nouveau mot de passe.",
+    "invalidLink": "Ce lien de réinitialisation est invalide ou a expiré.",
+    "genericError": "Une erreur est survenue."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Gérez votre compte et vos préférences.",
+    "profile": {
+      "heading": "Profil",
+      "subtitle": "Vos informations personnelles.",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Adresse email",
+      "emailNote": "Contactez un administrateur pour changer votre adresse email.",
+      "memberSince": "Membre depuis",
+      "id": "Identifiant",
+      "save": "Enregistrer les modifications",
+      "saved": "Profil mis à jour.",
+      "error": "Une erreur est survenue."
+    },
+    "security": {
+      "heading": "Sécurité",
+      "subtitle": "Changez votre mot de passe.",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer",
+      "submit": "Changer le mot de passe",
+      "success": "Mot de passe modifié avec succès.",
+      "mismatch": "La confirmation ne correspond pas au nouveau mot de passe.",
+      "error": "Une erreur est survenue."
+    },
+    "appearance": {
+      "heading": "Apparence",
+      "subtitle": "Personnalisez l'interface.",
+      "light": "Clair",
+      "dark": "Sombre"
+    },
+    "language": {
+      "heading": "Langue",
+      "subtitle": "Choisissez la langue d'affichage.",
+      "fr": "Français",
+      "en": "English"
+    },
+    "premium": "Premium",
+    "free": "Gratuit",
+    "dangerZone": {
+      "heading": "Zone de danger",
+      "subtitle": "Cette action est irréversible.",
+      "deleteButton": "Supprimer mon compte",
+      "confirmTitle": "Supprimer votre compte ?",
+      "confirmMessage": "Votre compte sera immédiatement désactivé et vos informations personnelles anonymisées. Vos formations, inscriptions et messages existants sont conservés (pour ne pas casser l'historique d'autres utilisateurs) mais ne vous seront plus jamais associés nommément. Cette action est définitive.",
+      "confirmLabel": "Supprimer définitivement",
+      "success": "Votre compte a été supprimé. Au revoir !",
+      "error": "La suppression du compte a échoué."
+    }
+  },
+  "admin": {
+    "workspaceLabel": "Admin Workspace",
+    "breadcrumbRoot": "Console",
+    "closeMenuAria": "Fermer le menu",
+    "openMenuAria": "Ouvrir le menu",
+    "header": {
+      "collapseTitle": "Réduire la barre latérale",
+      "expandTitle": "Agrandir la barre latérale"
+    },
+    "sidebarFooter": {
+      "settingsAria": "Paramètres",
+      "logoutAria": "Se déconnecter"
+    },
+    "searchPlaceholder": "Rechercher une formation, un utilisateur...",
+    "themeLight": "Passer au mode clair",
+    "themeDark": "Passer au mode sombre",
+    "notificationsAria": "Notifications",
+    "notifTitle": "Notifications",
+    "notif1New": "1 nouvelle",
+    "notifMarkRead": "Tout marquer lu",
+    "notifItemTitle": "Formation en attente de modération",
+    "notifItemBody": "Un formateur a soumis un nouveau module pédagogique.",
+    "notifItemTime": "Il y a 10 min",
+    "notifViewAll": "Voir le centre de modération →",
+    "roleFallbackShort": "Admin",
+    "roleFallbackLong": "Administrateur",
+    "profileMenuLink": "Mon profil & Paramètres",
+    "logout": "Se déconnecter",
+    "logoutConfirm": {
+      "title": "Se déconnecter ?",
+      "message": "Êtes-vous sûr de vouloir fermer votre session administrateur ?",
+      "confirmLabel": "Déconnexion"
+    },
+    "fallbackPage": {
+      "category": "Console",
+      "title": "Administration",
+      "subtitle": "Gestion de la plateforme AI Learning."
+    },
+    "nav": {
+      "pilotage": "Pilotage",
+      "dashboard": "Dashboard",
+      "usersAccess": "Utilisateurs & Accès",
+      "apprenants": "Apprenants",
+      "formateurs": "Formateurs",
+      "pedagogy": "Pédagogie & Catalogue",
+      "createFormation": "Créer une formation",
+      "allFormations": "Toutes les formations",
+      "documents": "Bibliothèque (validation)",
+      "categories": "Catégories",
+      "departements": "Départements",
+      "monetization": "Monétisation",
+      "etablissements": "Établissements",
+      "abonnements": "Abonnements",
+      "security": "Sécurité & Système",
+      "logs": "Journaux d'activité",
+      "settings": "Paramètres globaux"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Tableau de bord", "subtitle": "Aperçu global de l'activité et des flux de la plateforme." },
+      "apprenants": { "title": "Apprenants", "subtitle": "Comptes, statut et accès des apprenants." },
+      "formateurs": { "title": "Formateurs", "subtitle": "Comptes formateurs — création réservée à l'administrateur." },
+      "createFormation": { "title": "Créer une formation (Assistant Pas-à-Pas)", "subtitle": "Conception méthodique des modules, leçons, vidéos, supports et exercices." },
+      "allFormations": { "title": "Catalogue des formations", "subtitle": "Suivi et gestion de l'ensemble des modules pédagogiques." },
+      "documents": { "title": "Validation de la bibliothèque", "subtitle": "Modérez les documents PDF/EPUB déposés par les formateurs." },
+      "categories": { "title": "Catégories", "subtitle": "Organisation et arborescence des thématiques de formation." },
+      "departements": { "title": "Départements", "subtitle": "Un formateur ne peut publier que dans son propre département." },
+      "logs": { "title": "Journaux d'activité", "subtitle": "Audit de sécurité et traçabilité des actions sensibles." },
+      "settings": { "title": "Paramètres globaux", "subtitle": "Configuration générale et options de la plateforme." }
+    }
+  },
+  "instructor": {
+    "accountCategory": "Compte",
+    "workspaceLabel": "Espace Formateur",
+    "breadcrumbRoot": "Formateur",
+    "sidebarFooter": {
+      "settingsAria": "Paramètres",
+      "logoutAria": "Se déconnecter"
+    },
+    "searchPlaceholder": "Rechercher une de vos leçons, un élève...",
+    "themeLight": "Mode clair",
+    "themeDark": "Mode sombre",
+    "notifTitle": "Notifications Formateur",
+    "notif2Recent": "2 récentes",
+    "notifItem1Title": "Nouveau suivi d'apprenant",
+    "notifItem1Body": "3 nouveaux apprenants ont rejoint votre cours React & TypeScript.",
+    "notifItem2Title": "Formation Validée",
+    "notifItem2Body": "Votre cours a été validé par l'administration et est publié.",
+    "roleFallback": "Formateur",
+    "profileBadge": "Formateur Enseignant",
+    "profileMenuLink1": "Gérer mes formations",
+    "profileMenuLink2": "Paramètres",
+    "logout": "Se déconnecter",
+    "logoutConfirm": {
+      "title": "Se déconnecter ?",
+      "message": "Êtes-vous sûr de vouloir fermer votre session formateur ?",
+      "confirmLabel": "Déconnexion"
+    },
+    "fallbackPage": {
+      "category": "Espace Formateur",
+      "title": "Console Pédagogique",
+      "subtitle": "Espace de gestion des cours et supports d'apprentissage."
+    },
+    "nav": {
+      "dashboardGroup": "Tableau de bord",
+      "dashboard": "Vue Synthétique",
+      "pedagogy": "Espace Pédagogique",
+      "mesFormations": "Mes Formations",
+      "creerFormation": "Créer un cours",
+      "evaluations": "Quiz & Évaluations",
+      "suivi": "Suivi & Ressources",
+      "apprenants": "Mes Apprenants",
+      "messagerie": "Messagerie",
+      "bibliotheque": "Bibliothèque & Supports"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Tableau de bord Formateur", "subtitle": "Suivi global de vos cours, inscrits et indicateurs pédagogiques." },
+      "mesFormations": { "title": "Mes Formations", "subtitle": "Gérez le statut, les modules et les leçons de vos cours." },
+      "creerFormation": { "title": "Créer une nouvelle formation", "subtitle": "Concevez votre programme et soumettez-le à la modération." },
+      "evaluations": { "title": "Quiz & Évaluations", "subtitle": "Consultez les résultats de vos apprenants aux exercices." },
+      "apprenants": { "title": "Suivi des Apprenants", "subtitle": "Analysez l'avancement individuel et communiquez avec vos élèves." },
+      "messagerie": { "title": "Messagerie", "subtitle": "Discutez avec les apprenants qui vous ont écrit." },
+      "bibliotheque": { "title": "Bibliothèque & Supports", "subtitle": "Publiez des documents PDF/EPUB avec couverture automatique 3D." },
+      "parametres": { "title": "Paramètres", "subtitle": "Gérez votre profil, votre mot de passe et vos préférences." }
+    }
+  },
+  "student": {
+    "workspaceLabel": "Espace Apprenant",
+    "breadcrumbRoot": "Espace Apprenant",
+    "closeMenuAria": "Fermer le menu",
+    "openMenuAria": "Ouvrir le menu",
+    "sidebarFooter": {
+      "collapseTitle": "Réduire le menu",
+      "expandTitle": "Agrandir le menu",
+      "label": "Réduire le menu",
+      "currentCourseLabel": "Formation en cours",
+      "progressLabel": "{{percent}}% terminé",
+      "premiumUntil": "Premium jusqu'au {{date}}",
+      "freeBadge": "Compte Gratuit",
+      "settingsAria": "Paramètres",
+      "logoutAria": "Se déconnecter"
+    },
+    "header": {
+      "collapseTitle": "Réduire la barre latérale",
+      "expandTitle": "Agrandir la barre latérale"
+    },
+    "searchPlaceholder": "Rechercher une formation...",
+    "themeLight": "Passer au mode clair",
+    "themeDark": "Passer au mode sombre",
+    "notificationsAria": "Notifications",
+    "notifTitle": "Notifications",
+    "notifEmpty": "Aucune alerte",
+    "notifEmptyBody": "Vous êtes à jour ! Aucune nouvelle notification.",
+    "roleFallback": "Apprenant",
+    "profileMenuLink1": "Mes cours & Progression",
+    "profileMenuLink2": "Paramètres",
+    "logout": "Se déconnecter",
+    "logoutConfirm": {
+      "title": "Se déconnecter ?",
+      "message": "Voulez-vous vraiment fermer votre session d'apprentissage ?",
+      "confirmLabel": "Déconnexion"
+    },
+    "fallbackPage": {
+      "category": "Espace Apprenant",
+      "title": "Tableau de bord",
+      "subtitle": "Bienvenue sur votre espace de formation."
+    },
+    "nav": {
+      "apprentissage": "Apprentissage",
+      "dashboard": "Tableau de bord",
+      "catalogue": "Catalogue des formations",
+      "mesFormations": "Mes formations",
+      "coachIa": "Coach IA",
+      "messagerie": "Messagerie",
+      "ressources": "Ressources & Fil d'actus",
+      "actualites": "Actualités",
+      "bibliotheque": "Bibliothèque",
+      "outils": "Outils",
+      "abonnement": "Abonnement"
+    },
+    "pageTitles": {
+      "dashboard": { "category": "Accueil", "title": "Tableau de bord", "subtitle": "Aperçu global de votre parcours et de votre progression." },
+      "catalogue": { "category": "Catalogue", "title": "Catalogue des formations", "subtitle": "Explorez et découvrez vos prochains cours." },
+      "mesFormations": { "category": "Mes cours", "title": "Mes formations", "subtitle": "Retrouvez votre progression et vos cours suivis." },
+      "coachIa": { "category": "Coach IA", "title": "Coach IA", "subtitle": "Posez vos questions sur la leçon en cours à votre tuteur IA." },
+      "messagerie": { "category": "Messagerie", "title": "Messagerie", "subtitle": "Discutez avec les formateurs des formations auxquelles vous êtes inscrit." },
+      "actualites": { "category": "Actualités", "title": "Actualités & Nouveautés", "subtitle": "Découvrez les formations nouvellement partagées et les annonces." },
+      "bibliotheque": { "category": "Ressources", "title": "Bibliothèque Numérique", "subtitle": "Cherchez et consultez des documents pédagogiques par catégorie." },
+      "outils": { "category": "Outils", "title": "Outils", "subtitle": "Les outils pratiques à venir pour accompagner votre apprentissage." },
+      "outilsIde": { "category": "Outils", "title": "IDE en ligne", "subtitle": "Écrivez et exécutez du code directement dans votre navigateur." },
+      "outilsTableur": { "category": "Outils", "title": "Tableur", "subtitle": "Créez vos classeurs, pratiquez les formules et les calculs." },
+      "outilsNotes": { "category": "Outils", "title": "Prise de notes", "subtitle": "Vos notes personnelles, libres ou rattachées à une leçon." },
+      "outilsCalculatrice": { "category": "Outils", "title": "Calculatrice scientifique", "subtitle": "Trigonométrie, logarithmes, puissances, mémoire et historique." },
+      "outilsTableauBlanc": { "category": "Outils", "title": "Tableau blanc", "subtitle": "Dessinez vos schémas et mind-maps, sauvegardés dans votre espace." },
+      "outilsModelisation3d": { "category": "Outils", "title": "Modélisation 3D", "subtitle": "Assemblez des formes en 3D : déplacez, pivotez, colorez, sauvegardez." },
+      "abonnement": { "category": "Compte", "title": "Abonnement", "subtitle": "Votre situation et les formules disponibles." },
+      "parametres": { "category": "Compte", "title": "Paramètres", "subtitle": "Gérez votre profil, votre mot de passe et vos préférences." }
+    }
+  },
+  "etablissementAdmin": {
+    "workspaceLabel": "Espace Établissement",
+    "breadcrumbRoot": "Établissement",
+    "closeMenuAria": "Fermer le menu",
+    "openMenuAria": "Ouvrir le menu",
+    "roleFallback": "Responsable établissement",
+    "header": {
+      "collapseTitle": "Réduire la barre latérale",
+      "expandTitle": "Agrandir la barre latérale"
+    },
+    "sidebarFooter": {
+      "collapseTitle": "Réduire le menu",
+      "expandTitle": "Agrandir le menu",
+      "label": "Réduire le menu"
+    },
+    "themeLight": "Passer au mode clair",
+    "themeDark": "Passer au mode sombre",
+    "profileMenuLink": "Paramètres",
+    "logout": "Se déconnecter",
+    "logoutConfirm": {
+      "title": "Se déconnecter ?",
+      "message": "Voulez-vous vraiment fermer votre session établissement ?",
+      "confirmLabel": "Déconnexion"
+    },
+    "fallbackPage": {
+      "category": "Établissement",
+      "title": "Tableau de bord",
+      "subtitle": "Vue d'ensemble de votre établissement."
+    },
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "apprenants": "Apprenants",
+      "formateurs": "Formateurs",
+      "classes": "Classes & Filières"
+    },
+    "pageTitles": {
+      "dashboard": { "title": "Tableau de bord", "subtitle": "Statut de votre abonnement et effectifs de votre établissement." },
+      "apprenants": { "title": "Apprenants", "subtitle": "Les comptes apprenants rattachés à votre établissement." },
+      "formateurs": { "title": "Formateurs", "subtitle": "Les comptes formateurs rattachés à votre établissement." },
+      "classes": { "title": "Classes & Filières", "subtitle": "Organisez vos apprenants par classe et par filière." }
+    },
+    "dashboardPage": {
+      "codeLabel": "Code d'invitation",
+      "codeHint": "Partagez ce code à vos formateurs et apprenants pour qu'ils rejoignent votre établissement.",
+      "planLabel": "Formule",
+      "expiresLabel": "Expire le",
+      "noSubscription": "Aucun abonnement actif — contactez la plateforme.",
+      "membersLabel": "Membres au total",
+      "studentsCount": "Apprenants",
+      "instructorsCount": "Formateurs"
+    },
+    "membresPage": {
+      "empty": "Aucun compte pour l'instant.",
+      "emptyHint": "Partagez votre code d'invitation depuis le tableau de bord.",
+      "table": {
+        "name": "Nom",
+        "email": "Email",
+        "status": "Statut",
+        "classe": "Classe",
+        "since": "Membre depuis",
+        "actions": "Actions"
+      },
+      "active": "Actif",
+      "inactive": "Désactivé",
+      "block": "Bloquer",
+      "unblock": "Débloquer",
+      "noClasse": "— Aucune classe —",
+      "filterAllClasses": "Toutes les classes",
+      "classeUpdated": "Classe mise à jour.",
+      "blockConfirm": {
+        "title": "Bloquer ce compte ?",
+        "message": "\"{{name}}\" ne pourra plus se connecter à la plateforme tant que vous ne le débloquez pas.",
+        "confirmLabel": "Bloquer"
+      },
+      "unblockConfirm": {
+        "title": "Débloquer ce compte ?",
+        "message": "\"{{name}}\" pourra à nouveau se connecter à la plateforme.",
+        "confirmLabel": "Débloquer"
+      },
+      "blockSuccess": "Compte bloqué.",
+      "unblockSuccess": "Compte débloqué.",
+      "error": "Une erreur est survenue.",
+      "importButton": "Importer des apprenants",
+      "importModal": {
+        "title": "Importer des apprenants",
+        "intro": "Fichier .csv ou .xlsx avec deux colonnes : Nom et Email (compte Google). Tous les apprenants importés sont rattachés à la classe choisie.",
+        "classeLabel": "Classe de destination",
+        "classePlaceholder": "Choisir une classe...",
+        "noClasses": "Créez d'abord une classe dans « Classes & Filières ».",
+        "fileLabel": "Fichier (.csv ou .xlsx)",
+        "submit": "Importer",
+        "submitting": "Import en cours...",
+        "close": "Fermer",
+        "resultCreated": "{{count}} compte créé",
+        "resultCreated_other": "{{count}} comptes créés",
+        "resultUpdated": "{{count}} compte mis à jour (classe réaffectée)",
+        "resultUpdated_other": "{{count}} comptes mis à jour (classe réaffectée)",
+        "resultSkipped": "{{count}} ligne ignorée",
+        "resultSkipped_other": "{{count}} lignes ignorées",
+        "skippedReasonsTitle": "Détail des lignes ignorées",
+        "error": "Une erreur est survenue lors de l'import."
+      }
+    },
+    "classesPage": {
+      "filieresHeading": "Filières",
+      "newFiliere": "Nouvelle filière",
+      "classesHeading": "Classes",
+      "newClasse": "Nouvelle classe",
+      "noFilieres": "Aucune filière pour l'instant.",
+      "noClasses": "Aucune classe pour l'instant.",
+      "classesCount": "{{count}} classe",
+      "classesCount_other": "{{count}} classes",
+      "elevesCount": "{{count}} élève",
+      "elevesCount_other": "{{count}} élèves",
+      "noFiliereOption": "Aucune filière",
+      "editFiliere": "Modifier la filière",
+      "editClasse": "Modifier la classe",
+      "nomLabel": "Nom",
+      "filiereLabel": "Filière (optionnel)",
+      "deleteFiliereConfirm": {
+        "title": "Supprimer cette filière ?",
+        "message": "\"{{nom}}\" sera définitivement supprimée. Cette action est irréversible.",
+        "confirmLabel": "Supprimer"
+      },
+      "deleteClasseConfirm": {
+        "title": "Supprimer cette classe ?",
+        "message": "\"{{nom}}\" sera définitivement supprimée. Cette action est irréversible.",
+        "confirmLabel": "Supprimer"
+      },
+      "filiereSaved": "Filière enregistrée.",
+      "filiereDeleted": "Filière supprimée.",
+      "classeSaved": "Classe enregistrée.",
+      "classeDeleted": "Classe supprimée.",
+      "error": "Une erreur est survenue."
+    }
+  }
+}

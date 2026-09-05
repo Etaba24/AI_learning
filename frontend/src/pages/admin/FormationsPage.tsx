@@ -5,6 +5,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  UserCog,
   X,
   XCircle,
 } from 'lucide-react'
@@ -12,24 +13,28 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import {
+  DEFAULT_PAGE_SIZE,
   STATUT_BADGE_STYLES,
   STATUT_LABELS,
   type Formation,
   type FormationStatut,
   type PaginatedResponse,
+  type User,
 } from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { useConfirm } from '../../components/ConfirmContext'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 const FILTERS: Array<{ label: string; value: FormationStatut | 'ALL' }> = [
   { label: 'Toutes les formations', value: 'ALL' },
-  { label: '⏳ En attente de validation (Soumises)', value: 'SOUMISE' },
-  { label: '✅ Validées', value: 'VALIDEE' },
-  { label: '🚀 Publiées', value: 'PUBLIEE' },
-  { label: '❌ Refusées', value: 'REFUSEE' },
-  { label: '📝 Brouillons', value: 'BROUILLON' },
-  { label: '🔒 Dépubliées', value: 'DEPUBLIEE' },
+  { label: 'En attente de validation (Soumises)', value: 'SOUMISE' },
+  { label: 'Validées', value: 'VALIDEE' },
+  { label: 'Publiées', value: 'PUBLIEE' },
+  { label: 'Refusées', value: 'REFUSEE' },
+  { label: 'Brouillons', value: 'BROUILLON' },
+  { label: 'Dépubliées', value: 'DEPUBLIEE' },
 ]
 
 export function FormationsPage() {
@@ -37,24 +42,82 @@ export function FormationsPage() {
   const confirm = useConfirm()
 
   const [formations, setFormations] = useState<Formation[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pendingCount, setPendingCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FormationStatut | 'ALL'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [refusingId, setRefusingId] = useState<string | null>(null)
   const [motif, setMotif] = useState('')
+  const [instructors, setInstructors] = useState<User[]>([])
+  const [assigningId, setAssigningId] = useState<string | null>(null)
+  const [selectedFormateurId, setSelectedFormateurId] = useState('')
 
   // Modale d'inspection / prévisualisation pour l'administrateur
   const [previewFormation, setPreviewFormation] = useState<Formation | null>(null)
 
   function loadFormations() {
-    const query = filter === 'ALL' ? '' : `?statut=${filter}`
-    apiFetch<PaginatedResponse<Formation>>(`/formations/${query}`)
-      .then((data) => setFormations(data.results))
+    const params = new URLSearchParams()
+    if (filter !== 'ALL') params.set('statut', filter)
+    if (searchQuery.trim()) params.set('q', searchQuery.trim())
+    params.set('page', String(page))
+    apiFetch<PaginatedResponse<Formation>>(`/formations/?${params.toString()}`)
+      .then((data) => {
+        setFormations(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue lors du chargement.'))
   }
 
-  useEffect(loadFormations, [filter])
+  // Compte global (toutes pages confondues) des formations en attente de
+  // validation, indépendant du filtre/de la page affichés — sinon la
+  // bannière ne compterait que celles de la page actuellement visible.
+  function loadPendingCount() {
+    apiFetch<PaginatedResponse<Formation>>('/formations/?statut=SOUMISE')
+      .then((data) => setPendingCount(data.count))
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    const timeout = setTimeout(loadFormations, 250)
+    return () => clearTimeout(timeout)
+  }, [filter, searchQuery, page])
+  useEffect(() => setPage(1), [filter, searchQuery])
+  useEffect(loadPendingCount, [])
+  useRealtimeTopics(['admin_formations'], () => {
+    loadFormations()
+    loadPendingCount()
+  })
+
+  useEffect(() => {
+    apiFetch<PaginatedResponse<User>>('/users/?role=INSTRUCTOR')
+      .then((data) => setInstructors(data.results))
+      .catch(() => setInstructors([]))
+  }, [])
+
+  function openAssignFor(formation: Formation) {
+    setRefusingId(null)
+    setAssigningId(formation.id)
+    setSelectedFormateurId(formation.auteur ?? '')
+  }
+
+  async function confirmAssign(formation: Formation) {
+    if (!selectedFormateurId) return
+    try {
+      await apiFetch(`/formations/${formation.id}/assigner/`, {
+        method: 'POST',
+        body: { formateur_id: selectedFormateurId },
+      })
+      const formateur = instructors.find((i) => i.id === selectedFormateurId)
+      showToast('success', `"${formation.titre}" a été assignée à ${formateur?.email ?? 'ce formateur'}.`)
+      setAssigningId(null)
+      loadFormations()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : "Impossible d'assigner cette formation.")
+    }
+  }
 
   async function runAction(id: string, action: string, body?: unknown) {
     setActionError(null)
@@ -109,17 +172,6 @@ export function FormationsPage() {
     return <Alert variant="error" message={error} />
   }
 
-  const pendingFormationsCount = formations ? formations.filter((f) => f.statut === 'SOUMISE').length : 0
-
-  const filteredFormations = formations
-    ? formations.filter(
-        (f) =>
-          f.titre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          f.categorie_nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          f.auteur_email.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : []
-
   return (
     <div className="space-y-6">
       {/* BANNIÈRE DE MODÉRATION ET VALIDATION DES FORMATIONS */}
@@ -135,7 +187,7 @@ export function FormationsPage() {
             </div>
 
             <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Validation & Moderation des Formations 🛡️
+              Validation & Moderation des Formations
             </h1>
             <p className="mt-2 text-xs leading-relaxed text-sky-100/90 sm:text-sm">
               Examinez les contenus pédagogiques créés et soumis par les formateurs. Validez et publiez les cours conformes ou motivez le refus.
@@ -144,7 +196,7 @@ export function FormationsPage() {
 
           <div className="shrink-0 flex items-center gap-3">
             <Link
-              to="/admin/formations/new"
+              to="/admin/creer-formation"
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-sky-500 px-5 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-sky-500/25 transition-all hover:from-sky-500 hover:to-sky-600 active:scale-95"
             >
               <Plus size={16} />
@@ -155,7 +207,7 @@ export function FormationsPage() {
       </div>
 
       {/* RAPPEL SUR LES FORMATIONS EN ATTENTE DE VALIDATION */}
-      {pendingFormationsCount > 0 && (
+      {pendingCount > 0 && (
         <div className="flex items-center justify-between gap-4 rounded-3xl border border-amber-300 bg-amber-50 p-5 text-xs font-bold text-amber-900 shadow-md dark:border-amber-800/80 dark:bg-amber-950/60 dark:text-amber-200">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md">
@@ -163,7 +215,7 @@ export function FormationsPage() {
             </div>
             <div>
               <p className="text-sm font-extrabold">
-                {pendingFormationsCount} formation(s) en attente de validation par l'administrateur
+                {pendingCount} formation(s) en attente de validation par l'administrateur
               </p>
               <p className="text-[11px] font-normal text-amber-800 dark:text-amber-300">
                 Cliquez sur le filtre "Soumises" pour inspecter et valider le travail des enseignants.
@@ -175,7 +227,7 @@ export function FormationsPage() {
             onClick={() => setFilter('SOUMISE')}
             className="shrink-0 rounded-2xl bg-amber-600 px-4 py-2 text-xs font-extrabold text-white shadow-md hover:bg-amber-700 active:scale-95"
           >
-            Examiner la file ({pendingFormationsCount}) →
+            Examiner la file ({pendingCount}) →
           </button>
         </div>
       )}
@@ -231,7 +283,7 @@ export function FormationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filteredFormations.map((formation) => (
+                {formations.map((formation) => (
                   <tr
                     key={formation.id}
                     className="group transition-colors duration-150 hover:bg-sky-50/50 dark:hover:bg-sky-950/20"
@@ -294,6 +346,35 @@ export function FormationsPage() {
                             Annuler
                           </button>
                         </div>
+                      ) : assigningId === formation.id ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <select
+                            autoFocus
+                            value={selectedFormateurId}
+                            onChange={(event) => setSelectedFormateurId(event.target.value)}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          >
+                            <option value="">Choisir un formateur...</option>
+                            {instructors.map((instructor) => (
+                              <option key={instructor.id} value={instructor.id}>
+                                {instructor.email}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => confirmAssign(formation)}
+                            disabled={!selectedFormateurId}
+                            className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+                          >
+                            Confirmer
+                          </button>
+                          <button
+                            onClick={() => setAssigningId(null)}
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            Annuler
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex items-center justify-end gap-2">
                           {/* BOUTON APERÇU / INSPECTION */}
@@ -303,6 +384,16 @@ export function FormationsPage() {
                           >
                             <Eye size={13} />
                             <span>Inspecter</span>
+                          </button>
+
+                          {/* ASSIGNER À UN FORMATEUR */}
+                          <button
+                            onClick={() => openAssignFor(formation)}
+                            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                            title="Assigner cette formation à un formateur"
+                          >
+                            <UserCog size={13} />
+                            <span>Assigner</span>
                           </button>
 
                           {/* ACTION SOUMISE : VALIDER ET PUBLIER / REFUSER */}
@@ -347,9 +438,14 @@ export function FormationsPage() {
             </table>
           </div>
 
-          {filteredFormations.length === 0 && (
+          {formations.length === 0 && (
             <div className="p-12 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
               Aucune formation dans cette catégorie de statut.
+            </div>
+          )}
+          {formations.length > 0 && (
+            <div className="px-6 py-4">
+              <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
             </div>
           )}
         </div>
@@ -358,7 +454,7 @@ export function FormationsPage() {
       {/* MODALE D'INSPECTION & PRÉVISUALISATION PÉDAGOGIQUE ADMIN */}
       {previewFormation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-[fade-in_0.2s_ease-out]">
-          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             {/* EN-TÊTE MODALE */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -405,6 +501,92 @@ export function FormationsPage() {
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 dark:bg-slate-800/30 dark:border-slate-800">
                   {previewFormation.description || 'Aucune description saisie.'}
                 </p>
+              </div>
+
+              {/* PROGRAMME COMPLET : ce que l'admin doit réellement examiner
+                  avant de valider/publier, pas seulement les métadonnées. */}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                  Programme pédagogique ({previewFormation.modules?.length ?? 0} module
+                  {(previewFormation.modules?.length ?? 0) > 1 ? 's' : ''}) :
+                </h4>
+
+                {!previewFormation.modules || previewFormation.modules.length === 0 ? (
+                  <p className="mt-2 rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-slate-800">
+                    Aucun module créé — cette formation ne pourra pas être publiée (RG-003).
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-3">
+                    {previewFormation.modules.map((module, mIdx) => (
+                      <div
+                        key={module.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                          Module {mIdx + 1} : {module.titre}
+                        </p>
+                        {module.lecons.length === 0 ? (
+                          <p className="mt-1.5 text-[11px] italic text-slate-400">Aucune leçon dans ce module.</p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {module.lecons.map((lecon, lIdx) => (
+                              <div
+                                key={lecon.id}
+                                className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+                              >
+                                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">
+                                  Leçon {lIdx + 1} : {lecon.titre}
+                                </p>
+                                {lecon.contenu && (
+                                  <p className="mt-1 line-clamp-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                    {lecon.contenu}
+                                  </p>
+                                )}
+                                {lecon.video_url ? (
+                                  /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(lecon.video_url) ? (
+                                    <video
+                                      src={lecon.video_url}
+                                      controls
+                                      className="mt-2 w-full max-h-40 rounded-lg bg-black"
+                                    />
+                                  ) : (
+                                    <a
+                                      href={lecon.video_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="mt-1.5 inline-block text-[11px] font-bold text-sky-600 hover:underline dark:text-sky-400"
+                                    >
+                                      ▶ Voir la vidéo
+                                    </a>
+                                  )
+                                ) : (
+                                  <p className="mt-1.5 text-[10px] text-slate-400">Aucune vidéo.</p>
+                                )}
+                                <div className="mt-1.5 flex flex-wrap gap-2 text-[10px] font-semibold">
+                                  {lecon.ressources && lecon.ressources.length > 0 && (
+                                    <a
+                                      href={lecon.ressources[0].url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="rounded-lg bg-emerald-50 px-2 py-0.5 text-emerald-700 hover:underline dark:bg-emerald-500/10 dark:text-emerald-300"
+                                    >
+                                      📄 {lecon.ressources[0].nom}
+                                    </a>
+                                  )}
+                                  {lecon.exercices && lecon.exercices.length > 0 && (
+                                    <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                      {lecon.exercices.length} exercice{lecon.exercices.length > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {previewFormation.statut === 'REFUSEE' && previewFormation.motif_refus && (

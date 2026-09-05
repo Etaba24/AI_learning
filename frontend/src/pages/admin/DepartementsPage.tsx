@@ -1,11 +1,13 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
-import type { Departement, PaginatedResponse } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, type Departement, type PaginatedResponse } from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { useConfirm } from '../../components/ConfirmContext'
 import { Modal } from '../../components/Modal'
+import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 interface FormState {
   id: string | null
@@ -20,6 +22,8 @@ export function DepartementsPage() {
   const confirm = useConfirm()
 
   const [departements, setDepartements] = useState<Departement[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -28,12 +32,16 @@ export function DepartementsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function loadDepartements() {
-    apiFetch<PaginatedResponse<Departement>>('/departements/')
-      .then((data) => setDepartements(data.results))
+    apiFetch<PaginatedResponse<Departement>>(`/departements/?page=${page}`)
+      .then((data) => {
+        setDepartements(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }
 
-  useEffect(loadDepartements, [])
+  useEffect(loadDepartements, [page])
+  useRealtimeTopics(['admin_departements'], loadDepartements)
 
   function openCreateModal() {
     setForm(EMPTY_FORM)
@@ -100,7 +108,7 @@ export function DepartementsPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-          Départements {departements ? `(${departements.length})` : ''}
+          Départements {departements ? `(${count})` : ''}
         </h1>
         <button
           onClick={openCreateModal}
@@ -173,6 +181,9 @@ export function DepartementsPage() {
               Aucun département pour l'instant. Cliquez sur "Nouveau département" pour en créer un.
             </div>
           )}
+          <div className="px-6 py-4">
+            <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
+          </div>
         </div>
       )}
 

@@ -2,8 +2,10 @@ import { Newspaper, Sparkles, Clock, ArrowRight, Compass, Calendar, UserCheck, F
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
-import { NIVEAU_LABELS, type PaginatedResponse, type PublicFormation } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type PaginatedResponse, type PublicFormation } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { Pagination } from '../../components/Pagination'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 interface NewsAnnouncement {
   id: string
@@ -45,13 +47,21 @@ const PLATFORM_ANNOUNCEMENTS: NewsAnnouncement[] = [
 
 export function NewsPage() {
   const [recentFormations, setRecentFormations] = useState<PublicFormation[] | null>(null)
+  const [count, setCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    apiFetch<PaginatedResponse<PublicFormation>>('/catalogue/formations/')
-      .then((data) => setRecentFormations(data.results))
+  function loadFormations() {
+    apiFetch<PaginatedResponse<PublicFormation>>(`/catalogue/formations/?page=${page}`)
+      .then((data) => {
+        setRecentFormations(data.results)
+        setCount(data.count)
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des actualités.'))
-  }, [])
+  }
+
+  useEffect(loadFormations, [page])
+  useRealtimeTopics(['catalogue'], loadFormations)
 
   if (error) {
     return <Alert variant="error" message={error} />
@@ -96,7 +106,7 @@ export function NewsPage() {
             Nouveautés du catalogue
           </h2>
           <span className="text-xs font-bold text-slate-400">
-            {recentFormations.length} formation{recentFormations.length > 1 ? 's' : ''} disponible{recentFormations.length > 1 ? 's' : ''}
+            {count} formation{count > 1 ? 's' : ''} disponible{count > 1 ? 's' : ''}
           </span>
         </div>
 
@@ -159,6 +169,11 @@ export function NewsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {recentFormations.length > 0 && (
+          <div className="mt-4">
+            <Pagination count={count} page={page} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
           </div>
         )}
       </div>

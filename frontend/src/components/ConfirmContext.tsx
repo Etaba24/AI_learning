@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, HelpCircle, ShieldAlert, Trash2, X } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type ConfirmVariant = 'danger' | 'warning' | 'info' | 'success'
 
@@ -25,6 +26,7 @@ interface PendingConfirm {
  * conçu spécialement pour les suppressions, désactivations et confirmations.
  * Usage : `const confirm = useConfirm(); const ok = await confirm({ title, message, danger: true })` */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [isClosing, setIsClosing] = useState(false)
 
@@ -73,7 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       iconContainer: 'bg-rose-50 text-rose-600 border-rose-200/80 shadow-rose-500/10 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
       pulseRing: 'bg-rose-500/20 dark:bg-rose-500/30',
       Icon: Trash2,
-      badgeText: 'Action irréversible',
+      badgeText: t('confirm.badge.danger'),
       badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-800/40',
       confirmButton: 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white shadow-lg shadow-rose-500/25 focus:ring-rose-500/50',
     },
@@ -82,7 +84,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       iconContainer: 'bg-amber-50 text-amber-600 border-amber-200/80 shadow-amber-500/10 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
       pulseRing: 'bg-amber-500/20 dark:bg-amber-500/30',
       Icon: AlertTriangle,
-      badgeText: 'Attention requise',
+      badgeText: t('confirm.badge.warning'),
       badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-800/40',
       confirmButton: 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/25 focus:ring-amber-500/50',
     },
@@ -91,7 +93,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       iconContainer: 'bg-sky-50 text-sky-600 border-sky-200/80 shadow-sky-500/10 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20',
       pulseRing: 'bg-sky-500/20 dark:bg-sky-500/30',
       Icon: HelpCircle,
-      badgeText: 'Confirmation',
+      badgeText: t('confirm.badge.info'),
       badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-800/40',
       confirmButton: 'bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white shadow-lg shadow-sky-500/25 focus:ring-sky-500/50',
     },
@@ -100,7 +102,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       iconContainer: 'bg-emerald-50 text-emerald-600 border-emerald-200/80 shadow-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
       pulseRing: 'bg-emerald-500/20 dark:bg-emerald-500/30',
       Icon: CheckCircle2,
-      badgeText: 'Validation',
+      badgeText: t('confirm.badge.success'),
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-800/40',
       confirmButton: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 focus:ring-emerald-500/50',
     },
@@ -135,7 +137,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <button
               onClick={() => handleChoice(false)}
               className="absolute top-4 right-4 rounded-full p-1.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-              aria-label="Fermer"
+              aria-label={t('confirm.closeAria')}
             >
               <X size={18} />
             </button>
@@ -176,7 +178,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   onClick={() => handleChoice(false)}
                   className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80"
                 >
-                  {pending.options.cancelLabel ?? 'Annuler'}
+                  {pending.options.cancelLabel ?? t('confirm.cancelLabel')}
                 </button>
                 <button
                   type="button"
@@ -184,7 +186,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                   onClick={() => handleChoice(true)}
                   className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${variantStyles.confirmButton}`}
                 >
-                  {pending.options.confirmLabel ?? (variant === 'danger' ? 'Supprimer' : 'Confirmer')}
+                  {pending.options.confirmLabel ?? (variant === 'danger' ? t('confirm.deleteLabel') : t('confirm.confirmLabel'))}
                 </button>
               </div>
             </div>

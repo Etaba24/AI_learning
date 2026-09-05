@@ -1,6 +1,8 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
+from billing.permissions import HasActiveSubscription
+
 from core.utils import log_activity
 
 from .models import Note
@@ -12,7 +14,7 @@ class NoteListCreateView(generics.ListCreateAPIView):
     Chacun ne voit et ne manipule que ses propres notes."""
 
     serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_queryset(self):
         queryset = Note.objects.filter(proprietaire=self.request.user).select_related(
@@ -32,7 +34,7 @@ class NoteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET/PATCH/DELETE /api/notes/<uuid>/ — restreint au propriétaire."""
 
     serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasActiveSubscription]
 
     def get_queryset(self):
         return Note.objects.filter(proprietaire=self.request.user).select_related(
