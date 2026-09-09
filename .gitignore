@@ -16,7 +16,9 @@ frontend/dist/
 npm-debug.log*
 
 # Ignore large media that should not be versioned
+# Ignore large media that should not be versioned
 backend/media/videos-lecons/
+!backend/media/videos-lecons/.gitkeep
 
 # Éditeurs / OS
 .vscode/
