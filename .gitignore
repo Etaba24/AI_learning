@@ -15,6 +15,9 @@ frontend/node_modules/
 frontend/dist/
 npm-debug.log*
 
+# Ignore large media that should not be versioned
+backend/media/videos-lecons/
+
 # Éditeurs / OS
 .vscode/
 .idea/
