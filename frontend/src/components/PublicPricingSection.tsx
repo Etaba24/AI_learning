@@ -113,10 +113,6 @@ export function PublicPricingSection() {
                         <Check size={16} className="mt-0.5 shrink-0 text-emerald-500" />
                         <span>Suivi de votre progression en temps réel</span>
                       </li>
-                      <li className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300">
-                        <Check size={16} className="mt-0.5 shrink-0 text-emerald-500" />
-                        <span>Certificats de fin de formation vérifiables</span>
-                      </li>
                     </ul>
                   </div>
                 </div>

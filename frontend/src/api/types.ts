@@ -21,6 +21,15 @@ export interface User {
   date_joined: string
 }
 
+export interface AuditLogEntry {
+  id: string
+  utilisateur: string | null
+  utilisateur_email: string | null
+  action: string
+  detail: string
+  created_at: string
+}
+
 export interface Departement {
   id: string
   nom: string

@@ -109,6 +109,7 @@
       "lastName": "Last name",
       "email": "Email address",
       "emailNote": "Contact an administrator to change your email address.",
+      "departement": "Department",
       "memberSince": "Member since",
       "id": "ID",
       "save": "Save changes",
@@ -483,6 +484,30 @@
       "classeSaved": "Class saved.",
       "classeDeleted": "Class deleted.",
       "error": "Something went wrong."
+    }
+  }
+  ,
+  "home": {
+    "nav": {
+      "apropos": "About",
+      "formations": "Courses",
+      "services": "Services",
+      "abonnements": "Subscriptions",
+      "roles": "Spaces",
+      "temoignages": "Testimonials",
+      "contact": "Contact us"
+    },
+    "banner": {
+      "item1": "Contextual AI tutor available on every lesson",
+      "item2": "Structured courses: Learn, Practice, Be assessed",
+      "item3": "Guided paths and certifying assessments"
+    },
+    "hero": {
+      "badge": "Next-generation e-learning platform",
+      "title": "Learn, practice, progress with an AI tutor",
+      "subtitle": "AI Learning combines structured courses, practical exercises and an intelligent assistant that understands your progress in real time.",
+      "ctaPrimary": "Start for free",
+      "ctaSecondary": "Discover the concept"
     }
   }
 }

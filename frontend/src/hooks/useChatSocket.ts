@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { getAccessToken, getWebSocketUrl } from '../api/client'
+import { apiFetch, getAccessToken, getWebSocketUrl } from '../api/client'
 
 const RECONNECT_DELAY_MS = 3000
 
 /** Connexion temps réel à la messagerie (apprenant <-> formateur) : un seul
- * canal WebSocket authentifié par le même jeton JWT que l'API REST, qui
- * pousse un événement à chaque nouveau message concernant l'utilisateur
- * connecté — remplace le polling (setInterval) précédemment utilisé pour
- * rafraîchir la liste de contacts et le fil ouvert.
+ * canal WebSocket qui pousse un événement à chaque nouveau message
+ * concernant l'utilisateur connecté — remplace le polling (setInterval)
+ * précédemment utilisé pour rafraîchir la liste de contacts et le fil ouvert.
+ *
+ * Authentifié par un TICKET à usage unique (minté via /auth/ws-ticket/,
+ * un appel REST classique donc protégé par le header Authorization), plutôt
+ * que le jeton JWT complet placé en clair dans l'URL — celui-ci resterait
+ * exploitable jusqu'à 30 min s'il fuitait dans un log d'accès/proxy.
  *
  * Le canal est en écoute seule côté client : l'envoi de messages continue
  * de passer par l'API REST existante, qui applique déjà toute la règle
@@ -22,11 +26,20 @@ export function useChatSocket(onMessage: () => void) {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let cancelled = false
 
-    function connect() {
-      const token = getAccessToken()
-      if (!token || cancelled) return
+    async function connect() {
+      if (!getAccessToken() || cancelled) return
 
-      socket = new WebSocket(`${getWebSocketUrl('/ws/messagerie/')}?token=${encodeURIComponent(token)}`)
+      let ticket: string
+      try {
+        const result = await apiFetch<{ ticket: string }>('/auth/ws-ticket/', { method: 'POST' })
+        ticket = result.ticket
+      } catch {
+        if (!cancelled) reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
+        return
+      }
+      if (cancelled) return
+
+      socket = new WebSocket(`${getWebSocketUrl('/ws/messagerie/')}?ticket=${encodeURIComponent(ticket)}`)
 
       socket.onmessage = () => onMessageRef.current()
 

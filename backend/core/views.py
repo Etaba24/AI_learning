@@ -7,11 +7,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import User
-from accounts.permissions import IsInstructorOrAdmin
+from accounts.permissions import IsAdmin, IsInstructorOrAdmin
 from trainings.models import Formation
 
-from .models import Departement
-from .serializers import ContactMessageSerializer, DepartementSerializer
+from .models import Departement, JournalActivite
+from .serializers import ContactMessageSerializer, DepartementSerializer, JournalActiviteSerializer
 
 
 class ContactMessageView(APIView):
@@ -60,6 +60,14 @@ class AdminStatsView(APIView):
                 },
             }
         )
+
+
+class ActivityJournalListView(generics.ListAPIView):
+    """GET /api/admin/logs/ — journal d'activité réservé à l'admin."""
+
+    queryset = JournalActivite.objects.select_related("utilisateur").all().order_by("-created_at")
+    serializer_class = JournalActiviteSerializer
+    permission_classes = [IsAdmin]
 
 
 class DepartementListCreateView(generics.ListCreateAPIView):

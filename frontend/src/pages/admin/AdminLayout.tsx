@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ROLE_LABELS } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { useConfirm } from '../../components/ConfirmContext'
@@ -90,14 +90,50 @@ export function AdminLayout() {
     '/admin/settings': { category: t('admin.nav.security'), ...(t('admin.pageTitles.settings', { returnObjects: true }) as { title: string; subtitle: string }) },
   }
 
+  const navigate = useNavigate()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'admin-1',
+      title: 'Nouvelle soumission',
+      message: 'Une formation attend validation avant publication.',
+      time: 'Il y a 6 min',
+      read: false,
+      path: '/admin/formations',
+      tone: 'amber',
+    },
+    {
+      id: 'admin-2',
+      title: 'Audit de sécurité',
+      message: 'Un nouvel événement a été ajouté au journal des activités.',
+      time: 'Il y a 24 min',
+      read: false,
+      path: '/admin/logs',
+      tone: 'sky',
+    },
+  ])
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const unreadNotifications = notifications.filter((item) => !item.read).length
+
+  function handleOpenNotifications() {
+    const next = !showNotifications
+    setShowNotifications(next)
+    if (next) {
+      setNotifications((current) => current.map((item) => ({ ...item, read: true })))
+    }
+  }
+
+  function handleNotificationClick(path: string) {
+    setNotifications((current) => current.map((item) => (item.path === path ? { ...item, read: true } : item)))
+    setShowNotifications(false)
+    navigate(path)
+  }
 
   // Fermer les popups lors d'un clic à l'extérieur
   useEffect(() => {
@@ -317,12 +353,14 @@ export function AdminLayout() {
             {/* 2. CENTRE DE NOTIFICATIONS */}
             <div className="relative" ref={notifRef}>
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleOpenNotifications}
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 aria-label={t('admin.notificationsAria')}
               >
                 <Bell size={18} />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                {unreadNotifications > 0 && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                )}
               </button>
 
               {/* DROPDOWN NOTIFICATIONS */}
@@ -331,12 +369,14 @@ export function AdminLayout() {
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">{t('admin.notifTitle')}</h3>
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                        {t('admin.notif1New')}
-                      </span>
+                      {unreadNotifications > 0 && (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                          {unreadNotifications} nouveau{unreadNotifications > 1 ? 'x' : ''}
+                        </span>
+                      )}
                     </div>
                     <button
-                      onClick={() => setShowNotifications(false)}
+                      onClick={() => setNotifications((current) => current.map((item) => ({ ...item, read: true })))}
                       className="text-[11px] font-semibold text-sky-600 hover:underline dark:text-sky-400"
                     >
                       {t('admin.notifMarkRead')}
@@ -344,30 +384,43 @@ export function AdminLayout() {
                   </div>
 
                   <div className="space-y-2 py-3">
-                    <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3 transition-colors dark:border-amber-900/30 dark:bg-amber-500/10">
-                      <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                        <div>
-                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                            {t('admin.notifItemTitle')}
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-amber-800/80 dark:text-amber-300/80">
-                            {t('admin.notifItemBody')}
-                          </p>
-                          <span className="mt-1 block text-[10px] font-medium text-amber-600 dark:text-amber-400">{t('admin.notifItemTime')}</span>
+                    {notifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleNotificationClick(item.path)}
+                        className={`block w-full rounded-xl border p-3 text-left transition-colors ${
+                          item.tone === 'amber'
+                            ? 'border-amber-100 bg-amber-50/70 dark:border-amber-900/30 dark:bg-amber-500/10'
+                            : 'border-sky-100 bg-sky-50/70 dark:border-sky-900/30 dark:bg-sky-500/10'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-slate-300 dark:bg-slate-600' : item.tone === 'amber' ? 'bg-amber-500' : 'bg-sky-500'}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-bold ${item.read ? 'text-slate-700 dark:text-slate-200' : item.tone === 'amber' ? 'text-amber-900 dark:text-amber-200' : 'text-sky-900 dark:text-sky-200'}`}>
+                              {item.title}
+                            </p>
+                            <p className={`mt-0.5 text-[11px] ${item.read ? 'text-slate-500 dark:text-slate-400' : item.tone === 'amber' ? 'text-amber-800/80 dark:text-amber-300/80' : 'text-sky-800/80 dark:text-sky-300/80'}`}>
+                              {item.message}
+                            </p>
+                            <span className={`mt-1 block text-[10px] font-medium ${item.read ? 'text-slate-500 dark:text-slate-400' : item.tone === 'amber' ? 'text-amber-600 dark:text-amber-400' : 'text-sky-600 dark:text-sky-400'}`}>
+                              {item.time}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                      </button>
+                    ))}
                   </div>
 
                   <div className="border-t border-slate-100 pt-2 text-center dark:border-slate-800">
-                    <NavLink
-                      to="/admin/formations"
-                      onClick={() => setShowNotifications(false)}
+                    <button
+                      type="button"
+                      onClick={() => handleNotificationClick('/admin/formations')}
                       className="text-[11px] font-bold text-slate-500 hover:text-sky-600 dark:hover:text-sky-400"
                     >
                       {t('admin.notifViewAll')}
-                    </NavLink>
+                    </button>
                   </div>
                 </div>
               )}

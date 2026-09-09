@@ -198,6 +198,13 @@ export function ParametresPage() {
               <p className="mt-1 text-[11px] text-slate-400">{t('settings.profile.emailNote')}</p>
             </div>
 
+            {user.departement_nom && (
+              <div>
+                <label className={labelClass}>{t('settings.profile.departement')}</label>
+                <input value={user.departement_nom} disabled className={`${inputClass} cursor-not-allowed opacity-60`} />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 text-xs text-slate-500 dark:text-slate-400">
               <div>
                 <p className="font-bold text-slate-400">{t('settings.profile.memberSince')}</p>

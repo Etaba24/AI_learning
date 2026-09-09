@@ -1,9 +1,5 @@
 from django.urls import path
-from rest_framework_simplejwt.views import (
-    TokenBlacklistView,
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import views
 
@@ -16,11 +12,11 @@ urlpatterns = [
         views.RejoindreEtablissementView.as_view(),
         name="etablissement_rejoindre",
     ),
-    # TokenObtainPairView : vue toute faite de SimpleJWT. Comme USERNAME_FIELD
-    # vaut "email" sur notre User, elle attend directement {"email": ..., "password": ...}.
-    path("auth/login/", TokenObtainPairView.as_view(), name="login"),
+    # Vue conforme au User.email : elle attend directement {"email": ..., "password": ...}.
+    path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    path("auth/logout/", TokenBlacklistView.as_view(), name="logout"),
+    path("auth/logout/", views.LogoutView.as_view(), name="logout"),
+    path("auth/ws-ticket/", views.WebSocketTicketView.as_view(), name="ws_ticket"),
     path("auth/password-change/", views.PasswordChangeView.as_view(), name="password_change"),
     path("auth/password-reset/", views.PasswordResetRequestView.as_view(), name="password_reset"),
     path(

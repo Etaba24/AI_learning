@@ -10,7 +10,7 @@ interface AuthContextValue {
   // mot de passe (Google) : on stocke les jetons reçus et on récupère le
   // profil, sans repasser par /auth/login/.
   loginWithTokens: (tokens: { access: string; refresh: string }) => Promise<User>
-  logout: () => void
+  logout: () => Promise<void>
   // Recharge le profil depuis le serveur (ex: après modification dans la
   // page Paramètres) pour que le nom/avatar affichés dans la sidebar et le
   // menu profil se mettent à jour sans recharger la page.
@@ -81,10 +81,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return me
   }
 
-  function logout() {
-    clearTokens()
-    setUser(null)
-    setAbonnement(null)
+  async function logout(): Promise<void> {
+    try {
+      const refresh = localStorage.getItem('ai_learning_refresh')
+      if (refresh) {
+        await apiFetch('/auth/logout/', {
+          method: 'POST',
+          body: { refresh },
+        })
+      }
+    } catch {
+      // On ne bloque jamais la déconnexion locale si le backend refuse la
+      // revocation du refresh token (token déjà expiré/blacklisté).
+    } finally {
+      clearTokens()
+      setUser(null)
+      setAbonnement(null)
+    }
   }
 
   async function refreshUser() {

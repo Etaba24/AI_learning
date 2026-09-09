@@ -294,9 +294,9 @@ export function DashboardPage() {
       {/* SECTION CENTRALE : STATUT DU CATALOGUE ET ACTIVITÉ RÉCENTE */}
       <div className="grid gap-6 lg:grid-cols-7">
         {/* PANNEAU CATALOGUE & RÉPARTITION (4 cols sur 7) */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-4">
+        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700/80 dark:bg-slate-950/70 dark:shadow-[0_20px_45px_rgba(15,23,42,0.35)] lg:col-span-4">
           <div>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex items-center justify-between gap-4">
               <div>
                 <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
                   <Layers size={20} className="text-sky-600 dark:text-sky-400" />
@@ -317,9 +317,9 @@ export function DashboardPage() {
 
             {/* Tuiles interactives de statut */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-all hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700/80 dark:bg-slate-900/80 dark:hover:border-slate-600 dark:hover:bg-slate-800/90">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Brouillons</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Brouillons</span>
                   <span className="h-2 w-2 rounded-full bg-slate-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100">
@@ -327,49 +327,49 @@ export function DashboardPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 transition-all hover:bg-amber-100/70 dark:border-amber-900/40 dark:bg-amber-500/10">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 transition-all hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:hover:bg-amber-500/15">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Soumises</span>
-                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse dark:bg-amber-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-amber-800 dark:text-amber-200">
                   {stats.formations.soumise}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4 transition-all hover:bg-sky-100/70 dark:border-sky-900/40 dark:bg-sky-500/10">
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 transition-all hover:bg-sky-100 dark:border-sky-500/40 dark:bg-sky-500/10 dark:hover:bg-sky-500/15">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">Validées</span>
-                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  <span className="h-2 w-2 rounded-full bg-sky-500 dark:bg-sky-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-sky-800 dark:text-sky-200">
                   {stats.formations.validee}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4 transition-all hover:bg-rose-100/70 dark:border-rose-900/40 dark:bg-rose-500/10">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 transition-all hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:hover:bg-rose-500/15">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">Refusées</span>
-                  <span className="h-2 w-2 rounded-full bg-rose-500" />
+                  <span className="h-2 w-2 rounded-full bg-rose-500 dark:bg-rose-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-rose-800 dark:text-rose-200">
                   {stats.formations.refusee}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4 transition-all hover:bg-emerald-100/70 dark:border-emerald-900/40 dark:bg-emerald-500/10">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 transition-all hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Publiées</span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-emerald-800 dark:text-emerald-200">
                   {stats.formations.publiee}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 transition-all hover:bg-slate-100/80 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800/80">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700/80 dark:bg-slate-900/80 dark:hover:border-slate-600 dark:hover:bg-slate-800/90">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Dépubliées</span>
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Dépubliées</span>
                   <span className="h-2 w-2 rounded-full bg-slate-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100">
@@ -379,8 +379,8 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-800/30">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700/80 dark:bg-slate-900/80">
+            <span className="text-xs text-slate-600 dark:text-slate-300">
               Disponibilité du catalogue pour les apprenants :
             </span>
             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">

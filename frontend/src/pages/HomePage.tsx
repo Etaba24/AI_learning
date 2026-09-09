@@ -1,8 +1,11 @@
+import { Moon, Sun, Globe, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
 import { ROLE_LABELS } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { useTheme } from '../theme/ThemeContext'
 
 // Photos de personnes via pravatar.cc (placeholders libres, pas de compte requis) —
 // à remplacer par de vraies photos/illustrations lors du travail de charte graphique (section 11).
@@ -12,19 +15,11 @@ const COMMUNITY_AVATARS = [5, 12, 23, 44, 61, 15]
 const STEPS = [
   { title: 'Apprendre', text: 'Des formations structurées en modules et leçons : vidéos, textes, ressources.', bg: 'bg-sky-50', color: 'text-sky-700' },
   { title: 'Pratiquer', text: 'Des exercices et des quiz pour mettre en application chaque notion.', bg: 'bg-sky-50', color: 'text-sky-700' },
-  { title: 'Être évalué', text: 'Un score, une progression suivie, et une certification à la clé.', bg: 'bg-emerald-50', color: 'text-emerald-700' },
+  { title: 'Être évalué', text: 'Un score et une progression suivie sur chaque leçon.', bg: 'bg-emerald-50', color: 'text-emerald-700' },
   { title: 'Progresser', text: "Comprendre ses erreurs et avancer, accompagné par un tuteur IA contextuel.", bg: 'bg-amber-50', color: 'text-amber-700' },
 ]
 
-const NAV_LINKS = [
-  { href: '#apropos', label: 'À propos' },
-  { href: '#formations', label: 'Nos formations' },
-  { href: '#services', label: 'Nos services' },
-  { href: '/abonnements', label: 'Abonnements' },
-  { href: '#roles', label: 'Espaces' },
-  { href: '#temoignages', label: 'Témoignages' },
-  { href: '#contact', label: 'Nous contacter' },
-]
+// NAV_LINKS moved inside component to support translations via `t()`
 
 const TESTIMONIALS = [
   {
@@ -51,8 +46,8 @@ const TESTIMONIALS = [
     avatarId: 68,
     rating: 5,
     comment:
-      "La clarté des modules et le système de validation des leçons obligent à vraiment pratiquer. Je viens d'obtenir ma certification Flutter grâce à cette plateforme. Je recommande à 100% !",
-    tag: 'Certifié',
+      "La clarté des modules et le système de validation des leçons obligent à vraiment pratiquer. J'ai énormément progressé en Flutter grâce à cette plateforme. Je recommande à 100% !",
+    tag: 'Apprenant assidu',
   },
   {
     name: 'Claire Vance',
@@ -94,6 +89,23 @@ function arcPath(x2: number, y2: number): string {
 
 export function HomePage() {
   const { user, logout } = useAuth()
+  const { theme, toggleTheme, setTheme } = useTheme()
+  const { i18n, t } = useTranslation()
+
+  const NAV_LINKS = [
+    { href: '#apropos', label: t('home.nav.apropos') },
+    { href: '#formations', label: t('home.nav.formations') },
+    { href: '#services', label: t('home.nav.services') },
+    { href: '/abonnements', label: t('home.nav.abonnements') },
+    { href: '#roles', label: t('home.nav.roles') },
+    { href: '#temoignages', label: t('home.nav.temoignages') },
+    { href: '#contact', label: t('home.nav.contact') },
+  ]
+
+  function toggleLanguage() {
+    const next = i18n.language === 'fr' ? 'en' : 'fr'
+    i18n.changeLanguage(next)
+  }
 
   const [activeTestimonial, setActiveTestimonial] = useState<number | null>(null)
   const [likedTestimonials, setLikedTestimonials] = useState<Record<number, boolean>>({})
@@ -141,24 +153,24 @@ export function HomePage() {
   // la page vitrine + les liens de connexion/inscription.
   if (user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-sky-50 px-4 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-sky-50 px-4 text-center dark:bg-slate-950 dark:text-slate-100">
         <img
           src={avatar(32, 160)}
           alt=""
           className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-lg"
         />
-        <div className="max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="mb-3 text-2xl font-bold text-sky-700">
+        <div className="max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h1 className="mb-3 text-2xl font-bold text-sky-700 dark:text-sky-400">
             Bienvenue, {user.first_name || user.email}
           </h1>
-          <p className="mb-8 text-sm leading-relaxed text-slate-600">
-            Votre compte <span className="font-semibold text-sky-700">{ROLE_LABELS[user.role] ?? user.role}</span>{' '}
+          <p className="mb-8 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            Votre compte <span className="font-semibold text-sky-700 dark:text-sky-400">{ROLE_LABELS[user.role] ?? user.role}</span>{' '}
             est bien actif. L'espace complet dédié ({ROLE_LABELS[user.role] ?? ''} : formations,
             progression, assistant IA...) arrive dans un prochain incrément.
           </p>
           <button
             onClick={logout}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Se déconnecter
           </button>
@@ -168,27 +180,26 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* ================= BANDEAU D'ANNONCE ================= */}
-      <div className="overflow-hidden border-b border-sky-100 bg-sky-50 py-2.5 text-xs whitespace-nowrap text-sky-900">
+      <div className="overflow-hidden border-b border-sky-100 bg-sky-50 py-2.5 text-xs whitespace-nowrap text-sky-900 dark:border-sky-900/60 dark:bg-slate-900 dark:text-sky-200">
         <div className="inline-flex animate-[marquee_25s_linear_infinite] space-x-12">
-          <span>✦ Assistant IA pédagogique contextualisé, disponible sur chaque leçon</span>
-          <span>✦ Formations structurées : Apprendre, Pratiquer, Être évalué</span>
-          <span>✦ Certificats vérifiables publiquement</span>
-          <span>✦ Assistant IA pédagogique contextualisé, disponible sur chaque leçon</span>
+          <span>✦ {t('home.banner.item1')}</span>
+          <span>✦ {t('home.banner.item2')}</span>
+          <span>✦ {t('home.banner.item3')}</span>
         </div>
       </div>
 
       {/* ================= HEADER ================= */}
-      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center space-x-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-lg font-bold text-white">
               AI
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-sky-700">AI Learning</span>
+            <span className="text-xl font-extrabold tracking-tight text-sky-700 dark:text-sky-400">AI Learning</span>
           </div>
-          <nav className="hidden items-center space-x-8 text-sm font-medium text-slate-500 md:flex">
+          <nav className="hidden items-center space-x-8 text-sm font-medium text-slate-500 md:flex dark:text-slate-300">
             {NAV_LINKS.map((link) =>
               link.href.startsWith('/') ? (
                 <Link
@@ -211,21 +222,46 @@ export function HomePage() {
             )}
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:border-sky-200 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-500 dark:hover:text-sky-400"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              title="Réinitialiser le thème"
+              aria-label="Réinitialiser le thème"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:border-sky-200 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-500 dark:hover:text-sky-400"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              aria-label={t ? t('lang.toggle') : 'Toggle language'}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:border-sky-200 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-500 dark:hover:text-sky-400"
+            >
+              <Globe className="h-4 w-4" />
+            </button>
             <Link
               to="/login"
-              className="px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-sky-700 sm:px-4"
+              className="px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-sky-700 sm:px-4 dark:text-slate-300 dark:hover:text-sky-400"
             >
-              Se connecter
+              {t('auth.loginPanel.cta')}
             </Link>
             <Link
               to="/register"
               className="rounded-full bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-sky-600 sm:px-5"
             >
-              Créer un compte
+              {t('auth.registerPanel.cta')}
             </Link>
             <button
               onClick={() => setIsMenuOpen((open) => !open)}
-              className="ml-1 text-xl text-slate-500 hover:text-slate-700 md:hidden"
+              className="ml-1 text-xl text-slate-500 hover:text-slate-700 md:hidden dark:text-slate-300 dark:hover:text-slate-100"
               aria-label={isMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
             >
               {isMenuOpen ? '✕' : '☰'}
@@ -234,14 +270,14 @@ export function HomePage() {
         </div>
 
         {isMenuOpen && (
-          <nav className="flex flex-col gap-1 border-t border-slate-100 bg-white px-4 py-3 text-sm font-medium text-slate-600 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-slate-100 bg-white px-4 py-3 text-sm font-medium text-slate-600 md:hidden dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
             {NAV_LINKS.map((link) =>
               link.href.startsWith('/') ? (
                 <Link
                   key={link.href}
                   to={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer"
+                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-sky-400"
                 >
                   {link.label}
                 </Link>
@@ -250,7 +286,7 @@ export function HomePage() {
                   key={link.href}
                   href={link.href}
                   onClick={(e) => handleNavClick(e, link.href)}
-                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer"
+                  className="rounded px-2 py-2 transition-colors hover:bg-slate-50 hover:text-sky-900 cursor-pointer dark:hover:bg-slate-800 dark:hover:text-sky-400"
                 >
                   {link.label}
                 </a>
@@ -261,32 +297,30 @@ export function HomePage() {
       </header>
 
       {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-sky-50 to-white">
+      <section className="relative overflow-hidden bg-gradient-to-b from-sky-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:px-8 lg:py-24">
           <div className="text-center lg:col-span-6 lg:text-left">
-            <div className="mb-6 inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-1.5 text-xs font-semibold text-sky-800 shadow-sm">
-              Plateforme e-learning nouvelle génération
+            <div className="mb-6 inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-1.5 text-xs font-semibold text-sky-800 shadow-sm dark:border-sky-900/60 dark:bg-slate-900 dark:text-sky-300">
+              {t('home.hero.badge')}
             </div>
-            <h1 className="mb-6 text-4xl leading-[1.15] font-extrabold tracking-tight text-sky-700 sm:text-5xl">
-              Apprenez, pratiquez, progressez  accompagné par un tuteur IA
+            <h1 className="mb-6 text-4xl leading-[1.15] font-extrabold tracking-tight text-sky-700 sm:text-5xl dark:text-sky-400">
+              {t('home.hero.title')}
             </h1>
-            <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-slate-600 lg:mx-0">
-              AI Learning combine des formations structurées, des exercices pratiques et un
-              assistant intelligent qui comprend votre progression en temps réel, sans jamais
-              sortir du cadre pédagogique.
+            <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-slate-600 lg:mx-0 dark:text-slate-300">
+              {t('home.hero.subtitle')}
             </p>
             <div className="flex flex-col justify-center gap-4 sm:flex-row lg:justify-start">
               <Link
                 to="/register"
                 className="rounded-full bg-sky-500 px-8 py-4 text-center font-semibold text-white shadow-lg shadow-sky-950/10 transition-all hover:bg-sky-600"
               >
-                Commencer gratuitement
+                {t('home.hero.ctaPrimary')}
               </Link>
               <a
                 href="#parcours"
-                className="rounded-full border border-slate-200 bg-white px-8 py-4 text-center font-semibold text-slate-700 transition-all hover:bg-slate-50"
+                className="rounded-full border border-slate-200 bg-white px-8 py-4 text-center font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Découvrir le concept
+                {t('home.hero.ctaSecondary')}
               </a>
             </div>
           </div>
@@ -301,37 +335,37 @@ export function HomePage() {
               <div className="absolute left-6 z-20 h-3 w-3 -translate-x-1/2 animate-[travel-dot_8s_ease-in-out_infinite] rounded-full bg-sky-600 shadow-[0_0_0_5px_rgba(2,132,199,0.15)]"></div>
 
               <div className="space-y-5">
-                <div className="ml-4 flex animate-[card-glow-1_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-sky-700">
+                <div className="ml-4 flex animate-[card-glow-1_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
                     1
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-sky-700">Vous posez une question</p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">Vous posez une question</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                       "Je ne comprends pas cette notion dans la leçon en cours."
                     </p>
                   </div>
                 </div>
 
-                <div className="ml-4 flex animate-[card-glow-2_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-sky-700">
+                <div className="ml-4 flex animate-[card-glow-2_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
                     2
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-sky-700">L'IA analyse le contexte</p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">L'IA analyse le contexte</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                       Formation, module, leçon et niveau de progression.
                     </p>
                   </div>
                 </div>
 
-                <div className="ml-4 flex animate-[card-glow-3_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700">
+                <div className="ml-4 flex animate-[card-glow-3_8s_ease-in-out_infinite] items-start gap-4 rounded-2xl border-2 border-slate-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                     3
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-sky-700">Vous recevez une réponse claire</p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">Vous recevez une réponse claire</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                       Une explication adaptée à votre leçon, pas générique.
                     </p>
                   </div>
@@ -343,21 +377,21 @@ export function HomePage() {
       </section>
 
       {/* ================= À PROPOS ================= */}
-      <section id="apropos" className="py-24">
+      <section id="apropos" className="py-24 dark:bg-slate-950">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
           <div>
-            <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase">
+            <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase dark:text-sky-400">
               À propos
             </span>
-            <h2 className="mb-6 text-3xl font-extrabold text-sky-700">
+            <h2 className="mb-6 text-3xl font-extrabold text-sky-700 dark:text-sky-400">
               Pas un simple catalogue de cours
             </h2>
-            <p className="mb-4 leading-relaxed text-slate-600">
+            <p className="mb-4 leading-relaxed text-slate-600 dark:text-slate-300">
               AI Learning couvre tout le cycle d'apprentissage : apprendre, pratiquer, être
               évalué, comprendre ses erreurs et progresser. L'objectif n'est pas d'empiler des
               vidéos, mais de construire un accompagnement complet.
             </p>
-            <p className="leading-relaxed text-slate-600">
+            <p className="leading-relaxed text-slate-600 dark:text-slate-300">
               Au centre de cet accompagnement, un tuteur IA pédagogique contextuel — pas un
               chatbot généraliste. Il comprend la formation suivie, le module et la leçon en
               cours, votre niveau et votre progression, pour rester toujours pertinent et
@@ -473,7 +507,7 @@ export function HomePage() {
       </section>
 
       {/* ================= BANDE COMMUNAUTÉ ================= */}
-      <section className="border-y border-slate-100 bg-slate-50 py-10">
+      <section className="border-y border-slate-100 bg-slate-50 py-10 dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 text-center sm:flex-row sm:justify-center sm:gap-6">
           <div className="flex -space-x-3">
             {COMMUNITY_AVATARS.map((id) => (
@@ -485,20 +519,20 @@ export function HomePage() {
               />
             ))}
           </div>
-          <p className="text-sm font-medium text-slate-600">
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
             Apprenants et formateurs apprennent et enseignent ensemble sur AI Learning
           </p>
         </div>
       </section>
 
       {/* ================= NOS FORMATIONS ================= */}
-      <section id="formations" className="py-24">
+      <section id="formations" className="py-24 dark:bg-slate-950">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase">
+          <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase dark:text-sky-400">
             Nos formations
           </span>
-          <h2 className="mb-6 text-3xl font-extrabold text-sky-700">Un catalogue en construction</h2>
-          <p className="mb-10 leading-relaxed text-slate-600">
+          <h2 className="mb-6 text-3xl font-extrabold text-sky-700 dark:text-sky-400">Un catalogue en construction</h2>
+          <p className="mb-10 leading-relaxed text-slate-600 dark:text-slate-300">
             Chaque formation est structurée en modules et leçons — vidéos, supports, exercices et
             quiz — classée par catégorie et par niveau. Le catalogue s'ouvrira au fur et à mesure
             de la publication des premières formations par nos formateurs.
@@ -513,13 +547,13 @@ export function HomePage() {
       </section>
 
       {/* ================= NOS SERVICES ================= */}
-      <section id="services" className="py-24">
+      <section id="services" className="py-24 dark:bg-slate-950">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto mb-16 max-w-2xl text-center">
-            <h2 className="mb-4 text-3xl font-extrabold text-sky-700">
+            <h2 className="mb-4 text-3xl font-extrabold text-sky-700 dark:text-sky-400">
               Un cycle complet pour progresser sans limites
             </h2>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-slate-300">
               Bien plus qu'un catalogue de cours statique, un environnement pédagogique complet.
             </p>
           </div>
@@ -528,13 +562,13 @@ export function HomePage() {
             {STEPS.map((step, index) => (
               <div
                 key={step.title}
-                className="rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+                className="rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
               >
                 <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-xl text-sm font-bold ${step.bg} ${step.color}`}>
                   {String(index + 1).padStart(2, '0')}
                 </div>
-                <h3 className="mb-2 text-lg font-bold text-sky-700">{step.title}</h3>
-                <p className="text-sm leading-relaxed text-slate-600">{step.text}</p>
+                <h3 className="mb-2 text-lg font-bold text-sky-700 dark:text-sky-400">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{step.text}</p>
               </div>
             ))}
           </div>
@@ -542,19 +576,19 @@ export function HomePage() {
       </section>
 
       {/* ================= ESPACES & RÔLES ================= */}
-      <section id="roles" className="bg-slate-50 py-24">
+      <section id="roles" className="bg-slate-50 py-24 dark:bg-slate-900">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto mb-16 max-w-2xl text-center">
-            <h2 className="mb-4 text-3xl font-extrabold text-sky-700">
+            <h2 className="mb-4 text-3xl font-extrabold text-sky-700 dark:text-sky-400">
               Des espaces dédiés à chaque profil
             </h2>
-            <p className="text-slate-600">
+            <p className="text-slate-600 dark:text-slate-300">
               Une organisation sur-mesure pour les apprenants, les formateurs et les administrateurs.
             </p>
           </div>
 
           <div className="grid gap-8 md:grid-cols-3">
-            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
+            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div>
                 <img src={avatar(20, 160)} alt="" className="mb-4 h-14 w-14 rounded-full object-cover" />
                 <h3 className="mb-3 text-xl font-bold text-sky-700">Espace Apprenant</h3>
@@ -562,18 +596,17 @@ export function HomePage() {
                   <li>• Recherche et filtres de formations</li>
                   <li>• Suivi de progression en temps réel</li>
                   <li>• Assistant IA contextuel illimité</li>
-                  <li>• Certificats uniques vérifiables</li>
                 </ul>
               </div>
               <Link
                 to="/register"
-                className="block w-full rounded-xl bg-sky-50 py-3 text-center text-sm font-semibold text-sky-900 transition-all hover:bg-sky-100"
+                className="block w-full rounded-xl bg-sky-50 py-3 text-center text-sm font-semibold text-sky-900 transition-all hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900"
               >
                 Rejoindre comme apprenant
               </Link>
             </div>
 
-            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
+            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div>
                 <img src={avatar(54, 160)} alt="" className="mb-4 h-14 w-14 rounded-full object-cover" />
                 <h3 className="mb-3 text-xl font-bold text-sky-700">Espace Formateur</h3>
@@ -586,12 +619,12 @@ export function HomePage() {
               </div>
               {/* Inscription formateur pas encore auto-service : passera par un
                   autre canal (validation admin) dans un prochain incrément. */}
-              <div className="w-full cursor-not-allowed rounded-xl bg-slate-50 py-3 text-center text-sm font-semibold text-slate-400">
+              <div className="w-full cursor-not-allowed rounded-xl bg-slate-50 py-3 text-center text-sm font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-300">
                 Inscription formateur bientôt disponible
               </div>
             </div>
 
-            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
+            <div className="flex flex-col justify-between rounded-3xl border border-slate-100 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <div>
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-xl">
                   ⚙
@@ -601,10 +634,10 @@ export function HomePage() {
                   <li>• Validation des formations soumises</li>
                   <li>• Gestion des rôles et utilisateurs</li>
                   <li>• Pilotage des statistiques globales</li>
-                  <li>• Référentiel de certifications</li>
+                  <li>• Gestion des abonnements et établissements</li>
                 </ul>
               </div>
-              <div className="w-full cursor-not-allowed rounded-xl bg-slate-50 py-3 text-center text-sm font-semibold text-slate-400">
+              <div className="w-full cursor-not-allowed rounded-xl bg-slate-50 py-3 text-center text-sm font-semibold text-slate-400 dark:bg-slate-800 dark:text-slate-300">
                 Accès interne restreint
               </div>
             </div>
@@ -613,7 +646,7 @@ export function HomePage() {
       </section>
 
       {/* ================= SECTION TÉMOIGNAGES & AVIS (DISPOSITION UN PAR UN EN 1 SEULE COLONNE) ================= */}
-      <section id="temoignages" className="bg-slate-50/60 py-28">
+      <section id="temoignages" className="bg-slate-50/60 py-28 dark:bg-slate-900/80">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-20">
           
           {/* EN-TÊTE GRAND FORMAT */}
@@ -621,14 +654,14 @@ export function HomePage() {
             <span className="inline-block rounded-full bg-sky-100 px-4 py-1 text-xs font-bold uppercase tracking-wider text-sky-700">
               Avis & Témoignages
             </span>
-            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl leading-tight">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl leading-tight dark:text-slate-100">
               Ce que dit notre communauté
             </h2>
-            <p className="text-base text-slate-600 sm:text-lg max-w-2xl mx-auto">
+            <p className="text-base text-slate-600 sm:text-lg max-w-2xl mx-auto dark:text-slate-300">
               Découvrez l'impact d'AI Learning à travers les retours authentiques de nos apprenants et enseignants.
             </p>
             
-            <div className="pt-2 flex items-center justify-center gap-3 text-sm font-extrabold text-slate-700">
+            <div className="pt-2 flex items-center justify-center gap-3 text-sm font-extrabold text-slate-700 dark:text-slate-200">
               <span className="text-amber-400 text-lg">★★★★★</span>
               <span>Note moyenne de <strong className="text-sky-600">4.9 / 5</strong> basée sur plus de 1 200+ avis</span>
             </div>
@@ -645,8 +678,8 @@ export function HomePage() {
                   onClick={() => setActiveTestimonial(idx)}
                   className={`group relative space-y-6 rounded-3xl p-6 sm:p-8 transition-all duration-300 transform active:scale-[0.98] cursor-pointer border border-transparent ${
                     isActive
-                      ? 'bg-sky-50/80 border-sky-200/80 ring-4 ring-sky-100 shadow-xl scale-[1.01]'
-                      : 'hover:bg-slate-100/50 hover:border-slate-200/50'
+                      ? 'bg-sky-50/80 border-sky-200/80 ring-4 ring-sky-100 shadow-xl scale-[1.01] dark:bg-slate-900 dark:border-sky-900/60 dark:ring-sky-950/40'
+                      : 'hover:bg-slate-100/50 hover:border-slate-200/50 dark:hover:bg-slate-900/70 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-4">
@@ -681,19 +714,19 @@ export function HomePage() {
                     </div>
                   </div>
 
-                  <blockquote className="text-base sm:text-lg lg:text-xl font-normal leading-relaxed text-slate-700 tracking-wide transition-colors group-hover:text-slate-900">
+                  <blockquote className="text-base sm:text-lg lg:text-xl font-normal leading-relaxed text-slate-700 tracking-wide transition-colors group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:text-slate-100">
                     « {item.comment} »
                   </blockquote>
 
-                  <div className="flex items-center gap-4 pt-2 border-t border-slate-200/60">
+                  <div className="flex items-center gap-4 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
                     <img
                       src={avatar(item.avatarId, 140)}
                       alt={item.name}
                       className="h-16 w-16 rounded-full object-cover shadow-md ring-4 ring-sky-100 transition-transform duration-300 group-hover:scale-105"
                     />
                     <div>
-                      <h3 className="text-lg font-extrabold text-slate-900">{item.name}</h3>
-                      <p className="text-sm text-slate-500 font-medium">{item.role}</p>
+                      <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{item.name}</h3>
+                      <p className="text-sm text-slate-500 font-medium dark:text-slate-300">{item.role}</p>
                     </div>
                   </div>
                 </div>
@@ -705,7 +738,7 @@ export function HomePage() {
       </section>
 
       {/* ================= CTA FINAL ================= */}
-      <section className="bg-gradient-to-b from-white to-sky-50 py-24 text-center">
+      <section className="bg-gradient-to-b from-white to-sky-50 py-24 text-center dark:from-slate-950 dark:to-slate-900">
         <div className="mx-auto max-w-3xl px-4">
           <div className="mb-6 flex justify-center -space-x-3">
             {COMMUNITY_AVATARS.slice(0, 4).map((id) => (
@@ -717,10 +750,10 @@ export function HomePage() {
               />
             ))}
           </div>
-          <h2 className="mb-6 text-3xl font-extrabold text-sky-700 sm:text-4xl">
+          <h2 className="mb-6 text-3xl font-extrabold text-sky-700 sm:text-4xl dark:text-sky-400">
             Prêt à transformer votre manière d'apprendre ?
           </h2>
-          <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-slate-600">
+          <p className="mx-auto mb-10 max-w-xl text-lg leading-relaxed text-slate-600 dark:text-slate-300">
             Créez votre compte en quelques secondes et profitez de l'accompagnement d'un tuteur
             intelligent contextualisé.
           </p>
@@ -733,7 +766,7 @@ export function HomePage() {
             </Link>
             <Link
               to="/login"
-              className="rounded-full border border-slate-200 bg-white px-8 py-4 font-semibold text-slate-700 transition-all hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-white px-8 py-4 font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Se connecter
             </Link>
@@ -742,13 +775,13 @@ export function HomePage() {
       </section>
 
       {/* ================= FOOTER + CONTACT ================= */}
-      <footer id="contact" className="border-t border-slate-100 bg-slate-50 pt-20 pb-10 text-sm">
+      <footer id="contact" className="border-t border-slate-100 bg-slate-50 pt-20 pb-10 text-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto max-w-xl px-4 text-center sm:px-6 lg:px-8">
-          <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase">
+          <span className="mb-4 inline-block text-xs font-semibold tracking-wide text-sky-700 uppercase dark:text-sky-400">
             Nous contacter
           </span>
-          <h2 className="mb-4 text-3xl font-extrabold text-sky-700">Une question ?</h2>
-          <p className="mb-8 text-slate-600">
+          <h2 className="mb-4 text-3xl font-extrabold text-sky-700 dark:text-sky-400">Une question ?</h2>
+          <p className="mb-8 text-slate-600 dark:text-slate-300">
             Écrivez-nous et on vous répond par email.
           </p>
 

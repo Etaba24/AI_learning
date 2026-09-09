@@ -1,11 +1,13 @@
 import json
 import random
+import secrets
 import urllib.error
 import urllib.request
 from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db.models import ProtectedError
 from django.utils import timezone
@@ -14,8 +16,10 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from billing.models import Abonnement
 from billing.serializers import RejoindreEtablissementSerializer
@@ -67,6 +71,67 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
+
+
+class LoginView(TokenObtainPairView):
+    """Connexion avec journalisation d'audit et limitation de débit (audit
+    sécurité : sans ça, un mot de passe est devinable par force brute sans
+    aucune limite)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            email = (request.data.get("email") or "").strip()
+            if email:
+                user = User.objects.filter(email__iexact=email).first()
+                if user and user.is_active:
+                    log_activity(user, "LOGIN", user.email)
+        return response
+
+
+class LogoutView(APIView):
+    """Déconnexion avec blacklist du refresh token et journal d'audit."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except Exception:
+                pass
+        log_activity(request.user, "LOGOUT", request.user.email)
+        return Response({"detail": "Déconnexion réussie."})
+
+
+class WebSocketTicketView(APIView):
+    """POST /api/auth/ws-ticket/ — jeton à usage unique, valable quelques
+    secondes, à passer en `?ticket=` lors du handshake WebSocket (voir
+    core/middleware.py). Remplace la réutilisation directe du jeton JWT
+    d'accès dans l'URL : un navigateur ne peut pas fixer d'en-tête
+    Authorization sur une requête WebSocket, donc CE jeton-ci finit
+    nécessairement dans la query string — et une query string peut se
+    retrouver dans des logs d'accès serveur/proxy. Un JWT d'accès complet
+    qui y fuiterait resterait exploitable jusqu'à 30 minutes ; un ticket
+    consommé une seule fois et expiré en quelques secondes n'offre plus
+    rien à un attaquant qui lirait ce log après coup."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'ws_ticket'
+
+    TTL_SECONDES = 30
+
+    def post(self, request):
+        ticket = secrets.token_urlsafe(32)
+        cache.set(f"ws_ticket:{ticket}", str(request.user.pk), timeout=self.TTL_SECONDES)
+        return Response({"ticket": ticket, "expires_in": self.TTL_SECONDES})
 
 
 class GoogleAuthView(APIView):
@@ -78,6 +143,8 @@ class GoogleAuthView(APIView):
         chiffres est envoyé par email, à confirmer via GoogleConfirmView."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
     def post(self, request):
         serializer = GoogleAuthSerializer(data=request.data)
@@ -137,9 +204,18 @@ class GoogleAuthView(APIView):
 
 class GoogleConfirmView(APIView):
     """POST /api/auth/google/confirm/ — 2e étape de l'inscription Google :
-    le compte n'existe qu'à partir d'ici, une fois le code confirmé."""
+    le compte n'existe qu'à partir d'ici, une fois le code confirmé.
+
+    Limitation de débit STRICTE (audit sécurité) : le code n'a que 10 000
+    combinaisons (4 chiffres) — sans throttle, une attaque automatisée les
+    épuise en quelques secondes et peut détourner la création de compte
+    d'un email victime. À 5/min, le budget de tentatives est épuisé bien
+    avant les 10 000 essais nécessaires, largement au-delà des 10 min de
+    validité du code."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'google_confirm'
 
     def post(self, request):
         serializer = GoogleConfirmSerializer(data=request.data)
@@ -330,6 +406,8 @@ class PasswordResetRequestView(APIView):
     quels emails sont inscrits sur la plateforme (bonne pratique sécurité)."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -363,6 +441,8 @@ class PasswordResetConfirmView(APIView):
     le mot de passe."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)

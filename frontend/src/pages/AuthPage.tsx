@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/Alert'
 import { GoogleAuthButton } from '../components/GoogleAuthButton'
+import { useTheme } from '../theme/ThemeContext'
 
 type Mode = 'login' | 'register'
 type Step = 'form' | 'verify' | 'forgot'
@@ -32,6 +33,7 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
 
 export function AuthPage({ initialMode }: AuthPageProps) {
   const { t } = useTranslation()
+  const { theme } = useTheme()
   const { login, loginWithTokens } = useAuth()
   const navigate = useNavigate()
 
@@ -60,6 +62,13 @@ export function AuthPage({ initialMode }: AuthPageProps) {
   function switchMode(next: Mode) {
     setMode(next)
     setError(null)
+    // Whenever we switch mode, reset the step to the main form so that
+    // if the user came from "forgot password" we don't stay on that
+    // screen when they want to register/login.
+    setStep('form')
+    setForgotSuccess(false)
+    setForgotEmail('')
+    setVerifyCode('')
   }
 
   function goToDashboard(role: string) {
@@ -167,24 +176,28 @@ export function AuthPage({ initialMode }: AuthPageProps) {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-sky-50 px-4 py-12">
+    <div
+      className={`relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 transition-colors duration-200 ${
+        theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-sky-50 text-slate-900'
+      }`}
+    >
       {/* Formes décoratives en fond */}
-      <div className="absolute -top-16 -right-16 h-64 w-64 rotate-12 rounded-[3rem] bg-amber-100/70 blur-2xl"></div>
-      <div className="absolute -bottom-16 -left-16 h-72 w-72 rounded-full bg-sky-100/70 blur-2xl"></div>
+      <div className={`absolute -top-16 -right-16 h-64 w-64 rotate-12 rounded-[3rem] blur-2xl ${theme === 'dark' ? 'bg-sky-900/40' : 'bg-amber-100/70'}`} />
+      <div className={`absolute -bottom-16 -left-16 h-72 w-72 rounded-full blur-2xl ${theme === 'dark' ? 'bg-slate-800/80' : 'bg-sky-100/70'}`} />
 
       <Link
         to="/"
-        className="absolute top-6 left-6 z-20 text-sm font-semibold text-sky-900 hover:underline"
+        className={`absolute top-6 left-6 z-20 text-sm font-semibold hover:underline ${theme === 'dark' ? 'text-sky-300 hover:text-sky-200' : 'text-sky-900'}`}
       >
         {t('auth.backHome')}
       </Link>
 
-      <div className="relative z-10 w-full max-w-3xl overflow-hidden rounded-[2rem] bg-white shadow-xl sm:min-h-[560px]">
+      <div className={`relative z-10 w-full max-w-3xl overflow-hidden rounded-[2rem] border shadow-xl sm:min-h-[560px] ${theme === 'dark' ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
         {/* ================= PANNEAU COLORÉ ================= */}
         <div
-          className={`flex w-full flex-col items-center justify-center gap-5 bg-gradient-to-br from-sky-400 to-sky-600 px-8 py-12 text-center text-white transition-transform duration-700 ease-in-out sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 ${
-            mode === 'register' ? 'sm:translate-x-0' : 'sm:translate-x-full'
-          }`}
+          className={`flex w-full flex-col items-center justify-center gap-5 bg-gradient-to-br px-8 py-12 text-center text-white transition-transform duration-700 ease-in-out sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 ${
+            theme === 'dark' ? 'from-slate-900 to-sky-950' : 'from-sky-400 to-sky-600'
+          } ${mode === 'register' ? 'sm:translate-x-0' : 'sm:translate-x-full'}`}
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold">
             AI
@@ -217,13 +230,13 @@ export function AuthPage({ initialMode }: AuthPageProps) {
         {/* ================= PANNEAU FORMULAIRE ================= */}
         <div
           className={`w-full px-8 py-12 transition-transform duration-700 ease-in-out sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 ${
-            mode === 'register' ? 'sm:translate-x-full' : 'sm:translate-x-0'
-          }`}
+            theme === 'dark' ? 'bg-slate-900' : 'bg-white'
+          } ${mode === 'register' ? 'sm:translate-x-full' : 'sm:translate-x-0'}`}
         >
           {step === 'verify' ? (
             <>
-              <h1 className="mb-2 text-center text-2xl font-bold text-sky-700">{t('auth.verify.title')}</h1>
-              <p className="mb-6 text-center text-sm text-slate-500">
+              <h1 className={`mb-2 text-center text-2xl font-bold ${theme === 'dark' ? 'text-sky-400' : 'text-sky-700'}`}>{t('auth.verify.title')}</h1>
+              <p className={`mb-6 text-center text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                 {t('auth.verify.subtitle', { email: pendingEmail })}
               </p>
 
@@ -231,7 +244,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                 {error && <Alert variant="error" message={error} onClose={() => setError(null)} />}
 
                 <div>
-                  <label htmlFor="verifyCode" className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+                  <label htmlFor="verifyCode" className={`mb-1 block text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     {t('auth.verify.codeLabel')}
                   </label>
                   <input
@@ -245,7 +258,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                     value={verifyCode}
                     onChange={(event) => setVerifyCode(event.target.value.replace(/\D/g, '').slice(0, 4))}
                     placeholder="0000"
-                    className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-center text-lg font-bold tracking-[0.5em] text-slate-900 transition-colors focus:border-sky-500 focus:bg-white focus:outline-none"
+                    className={`w-full rounded-full border px-5 py-3 text-center text-lg font-bold tracking-[0.5em] transition-colors focus:outline-none ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-100 focus:border-sky-400 focus:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-sky-500 focus:bg-white'}`}
                   />
                 </div>
 
@@ -264,7 +277,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                     setVerifyCode('')
                     setError(null)
                   }}
-                  className="w-full text-center text-xs font-semibold text-slate-400 hover:text-sky-600"
+                  className={`w-full text-center text-xs font-semibold hover:text-sky-600 ${theme === 'dark' ? 'text-slate-400 hover:text-sky-400' : 'text-slate-400 hover:text-sky-600'}`}
                 >
                   {t('auth.verify.back')}
                 </button>
@@ -272,8 +285,8 @@ export function AuthPage({ initialMode }: AuthPageProps) {
             </>
           ) : step === 'forgot' ? (
             <>
-              <h1 className="mb-2 text-center text-2xl font-bold text-sky-700">{t('auth.forgot.title')}</h1>
-              <p className="mb-6 text-center text-sm text-slate-500">{t('auth.forgot.subtitle')}</p>
+              <h1 className={`mb-2 text-center text-2xl font-bold ${theme === 'dark' ? 'text-sky-400' : 'text-sky-700'}`}>{t('auth.forgot.title')}</h1>
+              <p className={`mb-6 text-center text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('auth.forgot.subtitle')}</p>
 
               {forgotSuccess ? (
                 <div className="space-y-4">
@@ -281,7 +294,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                   <button
                     type="button"
                     onClick={() => setStep('form')}
-                    className="w-full text-center text-xs font-semibold text-slate-400 hover:text-sky-600"
+                    className={`w-full text-center text-xs font-semibold hover:text-sky-600 ${theme === 'dark' ? 'text-slate-400 hover:text-sky-400' : 'text-slate-400 hover:text-sky-600'}`}
                   >
                     {t('auth.forgot.back')}
                   </button>
@@ -302,7 +315,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                       placeholder={t('auth.emailPlaceholder')}
                       value={forgotEmail}
                       onChange={(event) => setForgotEmail(event.target.value)}
-                      className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-900 transition-colors focus:border-sky-500 focus:bg-white focus:outline-none"
+                      className={`w-full rounded-full border px-5 py-3 text-sm transition-colors focus:outline-none ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-100 focus:border-sky-400 focus:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-sky-500 focus:bg-white'}`}
                     />
                   </div>
 
@@ -320,7 +333,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                       setStep('form')
                       setError(null)
                     }}
-                    className="w-full text-center text-xs font-semibold text-slate-400 hover:text-sky-600"
+                    className={`w-full text-center text-xs font-semibold hover:text-sky-600 ${theme === 'dark' ? 'text-slate-400 hover:text-sky-400' : 'text-slate-400 hover:text-sky-600'}`}
                   >
                     {t('auth.forgot.back')}
                   </button>
@@ -329,7 +342,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
             </>
           ) : (
           <>
-          <h1 className="mb-6 text-center text-2xl font-bold text-sky-700">
+          <h1 className={`mb-6 text-center text-2xl font-bold ${theme === 'dark' ? 'text-sky-400' : 'text-sky-700'}`}>
             {mode === 'register' ? t('auth.formTitle.register') : t('auth.formTitle.login')}
           </h1>
 
@@ -338,9 +351,9 @@ export function AuthPage({ initialMode }: AuthPageProps) {
           </div>
 
           <div className="mb-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-semibold uppercase text-slate-400">{t('auth.orDivider')}</span>
-            <div className="h-px flex-1 bg-slate-200" />
+            <div className={`h-px flex-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <span className={`text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-400'}`}>{t('auth.orDivider')}</span>
+            <div className={`h-px flex-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -350,7 +363,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
 
             {mode === 'register' && (
               <div>
-                <label htmlFor="fullName" className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+                <label htmlFor="fullName" className={`mb-1 block text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                   {t('auth.fullNameLabel')}
                 </label>
                 <input
@@ -360,13 +373,13 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                   placeholder={t('auth.fullNamePlaceholder')}
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
-                  className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-900 transition-colors focus:border-sky-500 focus:bg-white focus:outline-none"
+                  className={`w-full rounded-full border px-5 py-3 text-sm transition-colors focus:outline-none ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-100 focus:border-sky-400 focus:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-sky-500 focus:bg-white'}`}
                 />
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="mb-1 block text-xs font-semibold text-slate-500 uppercase">
+              <label htmlFor="email" className={`mb-1 block text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                 {t('auth.emailLabel')}
               </label>
               <input
@@ -376,13 +389,13 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                 placeholder={t('auth.emailPlaceholder')}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-900 transition-colors focus:border-sky-500 focus:bg-white focus:outline-none"
+                className={`w-full rounded-full border px-5 py-3 text-sm transition-colors focus:outline-none ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-100 focus:border-sky-400 focus:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-sky-500 focus:bg-white'}`}
               />
             </div>
 
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <label htmlFor="password" className="block text-xs font-semibold text-slate-500 uppercase">
+                <label htmlFor="password" className={`block text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                   {t('auth.passwordLabel')}
                 </label>
                 {mode === 'login' && (
@@ -403,12 +416,12 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                   placeholder="••••••••"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-3 pl-5 pr-12 text-sm text-slate-900 transition-colors focus:border-sky-500 focus:bg-white focus:outline-none"
+                  className={`w-full rounded-full border py-3 pl-5 pr-12 text-sm transition-colors focus:outline-none ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-100 focus:border-sky-400 focus:bg-slate-700' : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-sky-500 focus:bg-white'}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 ${theme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                   aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

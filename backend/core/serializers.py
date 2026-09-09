@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Departement
+from .models import Departement, JournalActivite
 
 
 class ContactMessageSerializer(serializers.Serializer):
@@ -15,3 +15,12 @@ class DepartementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Departement
         fields = ["id", "nom", "description"]
+
+
+class JournalActiviteSerializer(serializers.ModelSerializer):
+    utilisateur_email = serializers.EmailField(source="utilisateur.email", read_only=True)
+
+    class Meta:
+        model = JournalActivite
+        fields = ["id", "utilisateur", "utilisateur_email", "action", "detail", "created_at"]
+        read_only_fields = fields

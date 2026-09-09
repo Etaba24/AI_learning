@@ -15,7 +15,13 @@ import {
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
-import { NIVEAU_LABELS, type Inscription, type PaginatedResponse, type PublicFormationDetail } from '../../api/types'
+import {
+  NIVEAU_LABELS,
+  type Inscription,
+  type PaginatedResponse,
+  type PublicFormationDetail,
+  type PublicModule,
+} from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert } from '../../components/Alert'
 import { InteractiveLessonViewer } from '../../components/InteractiveLessonViewer'
@@ -39,8 +45,18 @@ export function FormationDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [isEnrolling, setIsEnrolling] = useState(false)
+  // Le catalogue public (/catalogue/formations/) ne renvoie qu'un sommaire
+  // (titres, jamais vidéo/supports/corrections — voir PublicLeconSerializer
+  // côté backend) : le contenu réel est chargé séparément, seulement une
+  // fois l'accès autorisé (inscrit, ou formateur/admin en prévisualisation),
+  // via /formations/<id>/contenu/ qui vérifie ce droit côté serveur.
+  const [isContentLoaded, setIsContentLoaded] = useState(false)
+  const [contentError, setContentError] = useState<string | null>(null)
 
   useEffect(() => {
+    setIsContentLoaded(false)
+    setContentError(null)
+
     apiFetch<PublicFormationDetail>(`/catalogue/formations/${id}/`)
       .then((data) => {
         setFormation(data)
@@ -64,6 +80,31 @@ export function FormationDetailPage() {
   // un formateur/admin — l'inscription reste le seul déclencheur pour un
   // véritable apprenant.
   const canAccessContent = Boolean(existingInscription) || isPreviewOnly
+
+  useEffect(() => {
+    if (!formation || !canAccessContent || isContentLoaded) return
+
+    apiFetch<{ id: string; titre: string; modules: PublicModule[] }>(`/formations/${id}/contenu/`)
+      .then((data) => {
+        const contenuParModule = new Map(data.modules.map((m) => [m.id, m]))
+        setFormation((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            modules: prev.modules.map((mod) => {
+              const modContenu = contenuParModule.get(mod.id)
+              if (!modContenu) return mod
+              const leconsParId = new Map(modContenu.lecons.map((l) => [l.id, l]))
+              return { ...mod, lecons: mod.lecons.map((lec) => leconsParId.get(lec.id) || lec) }
+            }),
+          }
+        })
+        setIsContentLoaded(true)
+      })
+      .catch((err) =>
+        setContentError(err instanceof ApiError ? err.message : 'Impossible de charger le contenu de la formation.'),
+      )
+  }, [formation, canAccessContent, isContentLoaded, id])
 
   useEffect(() => {
     if (formation && existingInscription) {
@@ -335,16 +376,25 @@ export function FormationDetailPage() {
               </button>
             </div>
 
-            <InteractiveLessonViewer
-              formationTitle={formation.titre}
-              moduleTitle={currentModule?.titre || ''}
-              moduleIndex={currentModuleIndex + 1}
-              lecon={currentLecon}
-              leconIndex={currentLeconIndex + 1}
-              totalLeconsInModule={currentModule?.lecons.length || 0}
-              isCompleted={completedLessonIds.includes(currentLecon.id)}
-              onCompleteAndNext={handleCompleteAndNextLesson}
-            />
+            {contentError ? (
+              <Alert variant="error" message={contentError} />
+            ) : isContentLoaded ? (
+              <InteractiveLessonViewer
+                formationTitle={formation.titre}
+                moduleTitle={currentModule?.titre || ''}
+                moduleIndex={currentModuleIndex + 1}
+                lecon={currentLecon}
+                leconIndex={currentLeconIndex + 1}
+                totalLeconsInModule={currentModule?.lecons.length || 0}
+                isCompleted={completedLessonIds.includes(currentLecon.id)}
+                onCompleteAndNext={handleCompleteAndNextLesson}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+                <p className="mt-3 text-xs font-semibold">Chargement du contenu de la leçon...</p>
+              </div>
+            )}
           </div>
         ) : /* NIVEAU 2 : APPRÉNANT A CLIQUÉ SUR UN MODULE -> LISTE DES LEÇONS SELON LE MODÈLE EXACT DE LA CAPTURE D'ÉCRAN */
         canAccessContent && currentModule ? (

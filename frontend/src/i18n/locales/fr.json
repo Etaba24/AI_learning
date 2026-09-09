@@ -109,6 +109,7 @@
       "lastName": "Nom",
       "email": "Adresse email",
       "emailNote": "Contactez un administrateur pour changer votre adresse email.",
+      "departement": "Département",
       "memberSince": "Membre depuis",
       "id": "Identifiant",
       "save": "Enregistrer les modifications",
@@ -483,6 +484,30 @@
       "classeSaved": "Classe enregistrée.",
       "classeDeleted": "Classe supprimée.",
       "error": "Une erreur est survenue."
+    }
+  }
+  ,
+  "home": {
+    "nav": {
+      "apropos": "À propos",
+      "formations": "Nos formations",
+      "services": "Nos services",
+      "abonnements": "Abonnements",
+      "roles": "Espaces",
+      "temoignages": "Témoignages",
+      "contact": "Nous contacter"
+    },
+    "banner": {
+      "item1": "Assistant IA pédagogique contextualisé, disponible sur chaque leçon",
+      "item2": "Formations structurées : Apprendre, Pratiquer, Être évalué",
+      "item3": "Des parcours guidés et des évaluations certifiantes"
+    },
+    "hero": {
+      "badge": "Plateforme e-learning nouvelle génération",
+      "title": "Apprenez, pratiquez, progressez accompagné par un tuteur IA",
+      "subtitle": "AI Learning combine des formations structurées, des exercices pratiques et un assistant intelligent qui comprend votre progression en temps réel.",
+      "ctaPrimary": "Commencer gratuitement",
+      "ctaSecondary": "Découvrir le concept"
     }
   }
 }

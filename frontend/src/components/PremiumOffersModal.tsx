@@ -79,7 +79,7 @@ export function PremiumOffersModal({ open, onClose }: PremiumOffersModalProps) {
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Catalogue complet de formations certifiantes
+                Catalogue complet de formations premium
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />

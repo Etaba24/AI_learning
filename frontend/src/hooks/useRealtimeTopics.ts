@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { getAccessToken, getWebSocketUrl } from '../api/client'
+import { apiFetch, getAccessToken, getWebSocketUrl } from '../api/client'
 
 const RECONNECT_DELAY_MS = 3000
 
@@ -10,6 +10,10 @@ const RECONNECT_DELAY_MS = 3000
  * Ce canal ne transporte jamais la donnée elle-même — juste le signal —
  * `onEvent` est donc rappelé pour déclencher un re-fetch ciblé via l'API
  * REST habituelle, qui reste l'unique source de vérité.
+ *
+ * Authentifié par un TICKET à usage unique (minté via /auth/ws-ticket/,
+ * un appel REST classique donc protégé par le header Authorization), plutôt
+ * que le jeton JWT complet placé en clair dans l'URL.
  *
  * Remplace le bouton "Actualiser"/le rechargement manuel : la page reste
  * synchronisée automatiquement tant qu'elle est ouverte. */
@@ -26,12 +30,21 @@ export function useRealtimeTopics(topics: string[], onEvent: () => void) {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let cancelled = false
 
-    function connect() {
-      const token = getAccessToken()
-      if (!token || cancelled) return
+    async function connect() {
+      if (!getAccessToken() || cancelled) return
+
+      let ticket: string
+      try {
+        const result = await apiFetch<{ ticket: string }>('/auth/ws-ticket/', { method: 'POST' })
+        ticket = result.ticket
+      } catch {
+        if (!cancelled) reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
+        return
+      }
+      if (cancelled) return
 
       socket = new WebSocket(
-        `${getWebSocketUrl('/ws/temps-reel/')}?token=${encodeURIComponent(token)}&topics=${encodeURIComponent(topicsKey)}`,
+        `${getWebSocketUrl('/ws/temps-reel/')}?ticket=${encodeURIComponent(ticket)}&topics=${encodeURIComponent(topicsKey)}`,
       )
 
       socket.onmessage = () => onEventRef.current()

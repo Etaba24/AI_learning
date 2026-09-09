@@ -2,18 +2,21 @@ from django.core.files.storage import default_storage
 from django.db.models import ProtectedError, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import User
 from accounts.permissions import IsAdmin, IsInstructorOrAdmin
+from core.uploads import extension_de, valider_signature_fichier
 from core.utils import log_activity
 
 from .models import Category, Formation, Lecon, Module, Ressource
 from .serializers import (
     CategorySerializer,
+    FormationContenuSerializer,
     FormationSerializer,
     LeconSerializer,
     ModuleSerializer,
@@ -83,6 +86,39 @@ class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
         if user.is_authenticated and user.role == User.Role.INSTRUCTOR:
             queryset = queryset.filter(auteur=user)
         return queryset
+
+
+class FormationContenuView(generics.RetrieveAPIView):
+    """GET /api/formations/<id>/contenu/ — contenu pédagogique COMPLET
+    (vidéos, supports téléchargeables, corrections d'exercices) d'une
+    formation. Contrairement au catalogue public (résumé seul — voir
+    PublicLeconSerializer), cette vue exige que l'appelant soit :
+      - l'administrateur (n'importe quelle formation, y compris brouillon),
+      - le formateur auteur (prévisualisation de son propre brouillon), ou
+      - un apprenant réellement inscrit à cette formation.
+    Sans quoi 403 — jamais de contenu servi "parce que l'id est connu"."""
+
+    queryset = Formation.objects.all()
+    serializer_class = FormationContenuSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        formation = get_object_or_404(Formation.objects.select_related("auteur"), pk=self.kwargs["pk"])
+        user = self.request.user
+
+        if user.role == User.Role.ADMIN:
+            return formation
+        if user.role == User.Role.INSTRUCTOR and formation.auteur_id == user.id:
+            return formation
+
+        from enrollments.models import Inscription
+
+        if Inscription.objects.filter(apprenant=user, formation=formation).exists():
+            return formation
+
+        raise PermissionDenied(
+            "Vous devez être inscrit à cette formation pour en consulter le contenu."
+        )
 
 
 class _FormationTransitionView(APIView):
@@ -231,6 +267,21 @@ class FormationAssignerView(APIView):
 # ============================================================
 
 
+def _formation_queryset_for(user):
+    """Formations qu'un utilisateur a le droit de gérer (créer/modifier du
+    contenu dedans) : toutes pour l'admin, seulement les siennes pour un
+    formateur. Base commune à TOUTES les vues imbriquées (modules, leçons,
+    ressources, exercices, quiz) — sans quoi chacune doit réimplémenter le
+    même filtre et une seule oubliée rouvre l'IDOR (cf. audit sécurité :
+    un formateur ne doit jamais pouvoir lire/modifier/supprimer le contenu
+    d'une formation qui n'est pas la sienne)."""
+
+    queryset = Formation.objects.all()
+    if user.is_authenticated and user.role == User.Role.INSTRUCTOR:
+        queryset = queryset.filter(auteur=user)
+    return queryset
+
+
 class ModuleListCreateView(generics.ListCreateAPIView):
     """GET/POST /api/formations/<formation_id>/modules/"""
 
@@ -238,10 +289,13 @@ class ModuleListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Module.objects.filter(formation_id=self.kwargs["formation_id"])
+        return Module.objects.filter(
+            formation_id=self.kwargs["formation_id"],
+            formation__in=_formation_queryset_for(self.request.user),
+        )
 
     def perform_create(self, serializer):
-        formation = get_object_or_404(Formation, pk=self.kwargs["formation_id"])
+        formation = get_object_or_404(_formation_queryset_for(self.request.user), pk=self.kwargs["formation_id"])
         serializer.save(formation=formation)
 
 
@@ -252,7 +306,10 @@ class ModuleDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Module.objects.filter(formation_id=self.kwargs["formation_id"])
+        return Module.objects.filter(
+            formation_id=self.kwargs["formation_id"],
+            formation__in=_formation_queryset_for(self.request.user),
+        )
 
 
 # ============================================================
@@ -267,10 +324,16 @@ class LeconListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Lecon.objects.filter(module_id=self.kwargs["module_id"])
+        return Lecon.objects.filter(
+            module_id=self.kwargs["module_id"],
+            module__formation__in=_formation_queryset_for(self.request.user),
+        )
 
     def perform_create(self, serializer):
-        module = get_object_or_404(Module, pk=self.kwargs["module_id"])
+        module = get_object_or_404(
+            Module.objects.filter(formation__in=_formation_queryset_for(self.request.user)),
+            pk=self.kwargs["module_id"],
+        )
         serializer.save(module=module)
 
 
@@ -281,7 +344,10 @@ class LeconDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Lecon.objects.filter(module_id=self.kwargs["module_id"])
+        return Lecon.objects.filter(
+            module_id=self.kwargs["module_id"],
+            module__formation__in=_formation_queryset_for(self.request.user),
+        )
 
 
 class LeconVideoUploadView(APIView):
@@ -297,7 +363,7 @@ class LeconVideoUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     FORMATS_AUTORISES = (".mp4", ".webm", ".ogg", ".mov")
-    TAILLE_MAX_OCTETS = 300 * 1024 * 1024  # 300 Mo
+    TAILLE_MAX_OCTETS = 100 * 1024 * 1024  # 100 Mo
 
     def post(self, request):
         fichier = request.FILES.get("fichier")
@@ -311,7 +377,12 @@ class LeconVideoUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if fichier.size > self.TAILLE_MAX_OCTETS:
-            return Response({"detail": "Fichier trop volumineux (300 Mo maximum)."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Fichier trop volumineux (100 Mo maximum)."}, status=status.HTTP_400_BAD_REQUEST)
+        if not valider_signature_fichier(fichier, extension_de(nom)):
+            return Response(
+                {"detail": "Le contenu du fichier ne correspond pas au format vidéo déclaré."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         chemin = default_storage.save(f"videos-lecons/{fichier.name}", fichier)
         video_url = request.build_absolute_uri(default_storage.url(chemin))
@@ -349,6 +420,11 @@ class RessourceUploadView(APIView):
             )
         if fichier.size > self.TAILLE_MAX_OCTETS:
             return Response({"detail": "Fichier trop volumineux (50 Mo maximum)."}, status=status.HTTP_400_BAD_REQUEST)
+        if not valider_signature_fichier(fichier, extension_de(nom)):
+            return Response(
+                {"detail": "Le contenu du fichier ne correspond pas au format déclaré."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         chemin = default_storage.save(f"ressources-lecons/{fichier.name}", fichier)
         url = request.build_absolute_uri(default_storage.url(chemin))
@@ -362,10 +438,16 @@ class RessourceListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Ressource.objects.filter(lecon_id=self.kwargs["lecon_id"])
+        return Ressource.objects.filter(
+            lecon_id=self.kwargs["lecon_id"],
+            lecon__module__formation__in=_formation_queryset_for(self.request.user),
+        )
 
     def perform_create(self, serializer):
-        lecon = get_object_or_404(Lecon, pk=self.kwargs["lecon_id"])
+        lecon = get_object_or_404(
+            Lecon.objects.filter(module__formation__in=_formation_queryset_for(self.request.user)),
+            pk=self.kwargs["lecon_id"],
+        )
         serializer.save(lecon=lecon)
 
 
@@ -376,7 +458,10 @@ class RessourceDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsInstructorOrAdmin]
 
     def get_queryset(self):
-        return Ressource.objects.filter(lecon_id=self.kwargs["lecon_id"])
+        return Ressource.objects.filter(
+            lecon_id=self.kwargs["lecon_id"],
+            lecon__module__formation__in=_formation_queryset_for(self.request.user),
+        )
 
 
 # ============================================================

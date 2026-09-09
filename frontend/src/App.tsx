@@ -6,6 +6,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ConfirmProvider } from './components/ConfirmContext'
 import { ToastProvider } from './components/ToastContext'
 import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminLogsPage } from './pages/admin/AdminLogsPage'
 import { ApprenantsPage } from './pages/admin/ApprenantsPage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
@@ -79,7 +80,7 @@ function App() {
           <Route path="/welcome" element={<WelcomePage />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'INSTRUCTOR']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="apprenants" element={<ApprenantsPage />} />
@@ -90,6 +91,7 @@ function App() {
             <Route path="abonnements" element={<AbonnementsPage />} />
             <Route path="formations" element={<FormationsPage />} />
             <Route path="documents" element={<DocumentsPage />} />
+            <Route path="logs" element={<AdminLogsPage />} />
             <Route path="creer-formation" element={<CreateFormationWizardPage />} />
             <Route path="creer-formation/:id" element={<CreateFormationWizardPage />} />
             <Route path="formations/:id" element={<FormationFormPage />} />
@@ -98,7 +100,7 @@ function App() {
         </Route>
 
         {/* ESPACE FORMATEUR / ENSEIGNANT */}
-        <Route element={<ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['INSTRUCTOR']} />}>
           <Route path="/formateur" element={<InstructorLayout />}>
             <Route index element={<InstructorDashboardPage />} />
             <Route path="mes-formations" element={<InstructorFormationsPage />} />
@@ -123,8 +125,8 @@ function App() {
           </Route>
         </Route>
 
-        {/* ESPACE APPRENANT (ACCESSIBLE À TOUS LES RÔLES) */}
-        <Route element={<ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']} />}>
+        {/* ESPACE APPRENANT (RÉSERVÉ AUX APPRENANTS) */}
+        <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
           <Route path="/apprenant" element={<StudentLayout />}>
             <Route index element={<StudentDashboardPage />} />
             <Route path="catalogue" element={<CataloguePage />} />
@@ -141,8 +143,17 @@ function App() {
             <Route path="outils/calculatrice" element={<PremiumGate><CalculatricePage /></PremiumGate>} />
             <Route path="outils/tableau-blanc" element={<PremiumGate><TableauBlancPage /></PremiumGate>} />
             <Route path="outils/modelisation-3d" element={<PremiumGate><Modelisation3DPage /></PremiumGate>} />
-            <Route path="formations/:id" element={<FormationDetailPage />} />
             <Route path="parametres" element={<ParametresPage />} />
+          </Route>
+        </Route>
+
+        {/* Un formateur/admin peut consulter l'intégralité d'une formation
+            (la sienne, ou toute formation côté admin) sans avoir accès au
+            reste de l'espace apprenant — seule cette page précise leur est
+            ouverte, jamais le dashboard/catalogue/outils/messagerie apprenant. */}
+        <Route element={<ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']} />}>
+          <Route path="/apprenant" element={<StudentLayout />}>
+            <Route path="formations/:id" element={<FormationDetailPage />} />
           </Route>
         </Route>
 

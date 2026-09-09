@@ -148,12 +148,16 @@ class PublicFormationSerializer(serializers.ModelSerializer):
 
 
 class PublicLeconSerializer(serializers.ModelSerializer):
-    ressources = RessourceSerializer(many=True, read_only=True)
-    exercices = ExerciceSerializer(many=True, read_only=True)
+    """Sommaire uniquement — jamais le contenu réel (vidéo, supports,
+    corrections d'exercices). Cette vue est AllowAny/pré-inscription : le
+    contenu payant ne doit être atteignable qu'via FormationContenuView,
+    qui vérifie une vraie inscription (ou la propriété/l'admin). Ne JAMAIS
+    ajouter `video_url`/`ressources`/`exercices`/`contenu` ici, sous peine
+    de recréer la fuite (RF-021 : contourne sinon tout le mur payant)."""
 
     class Meta:
         model = Lecon
-        fields = ["id", "titre", "contenu", "video_url", "ordre", "ressources", "exercices"]
+        fields = ["id", "titre", "ordre"]
 
 
 class PublicModuleSerializer(serializers.ModelSerializer):
@@ -166,9 +170,45 @@ class PublicModuleSerializer(serializers.ModelSerializer):
 
 class PublicFormationDetailSerializer(PublicFormationSerializer):
     """Fiche détaillée avant inscription (RF-021) : ajoute objectifs,
-    prérequis et le sommaire (titres des modules/leçons, pas le contenu)."""
+    prérequis et le sommaire (titres des modules/leçons, pas le contenu —
+    voir PublicLeconSerializer)."""
 
     modules = PublicModuleSerializer(many=True, read_only=True)
 
     class Meta(PublicFormationSerializer.Meta):
         fields = PublicFormationSerializer.Meta.fields + ["objectifs", "prerequis", "modules"]
+
+
+# ============================================================
+# Contenu réel d'une formation — réservé aux inscrits (ou à l'auteur
+# formateur/l'admin en prévisualisation), jamais public. Chaîne de
+# serializers volontairement séparée de PublicFormationDetailSerializer
+# (jamais un héritage entre les deux) pour qu'un futur ajout de champ sur
+# l'un ne puisse jamais fuiter accidentellement dans l'autre.
+# ============================================================
+
+
+class LeconContenuSerializer(serializers.ModelSerializer):
+    ressources = RessourceSerializer(many=True, read_only=True)
+    exercices = ExerciceSerializer(many=True, read_only=True)
+    quiz = QuizSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Lecon
+        fields = ["id", "titre", "contenu", "video_url", "ordre", "ressources", "exercices", "quiz"]
+
+
+class ModuleContenuSerializer(serializers.ModelSerializer):
+    lecons = LeconContenuSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Module
+        fields = ["id", "titre", "description", "ordre", "lecons"]
+
+
+class FormationContenuSerializer(serializers.ModelSerializer):
+    modules = ModuleContenuSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Formation
+        fields = ["id", "titre", "modules"]

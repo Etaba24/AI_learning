@@ -68,6 +68,7 @@ class UserSerializer(serializers.ModelSerializer):
     changer lui-même depuis son profil."""
 
     etablissement_nom = serializers.CharField(source="etablissement.nom", read_only=True, default=None)
+    departement_nom = serializers.CharField(source="departement.nom", read_only=True, default=None)
 
     class Meta:
         model = User
@@ -80,6 +81,7 @@ class UserSerializer(serializers.ModelSerializer):
             "bio",
             "avatar_url",
             "etablissement_nom",
+            "departement_nom",
             "date_joined",
         ]
         read_only_fields = ["id", "email", "role", "etablissement_nom", "date_joined"]

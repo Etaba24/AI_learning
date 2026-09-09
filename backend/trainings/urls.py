@@ -7,6 +7,7 @@ urlpatterns = [
     path("categories/<uuid:pk>/", views.CategoryDetailView.as_view(), name="category-detail"),
     path("formations/", views.FormationListCreateView.as_view(), name="formation-list"),
     path("formations/<uuid:pk>/", views.FormationDetailView.as_view(), name="formation-detail"),
+    path("formations/<uuid:pk>/contenu/", views.FormationContenuView.as_view(), name="formation-contenu"),
     path("formations/<uuid:pk>/submit/", views.FormationSubmitView.as_view(), name="formation-submit"),
     path("formations/<uuid:pk>/validate/", views.FormationValidateView.as_view(), name="formation-validate"),
     path("formations/<uuid:pk>/refuse/", views.FormationRefuseView.as_view(), name="formation-refuse"),

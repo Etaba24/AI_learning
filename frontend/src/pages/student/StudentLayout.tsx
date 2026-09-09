@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/client'
 import { ROLE_LABELS, type Inscription, type PaginatedResponse } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
@@ -79,14 +79,50 @@ export function StudentLayout() {
     '/apprenant/parametres': (t('student.pageTitles.parametres', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
   }
 
+  const navigate = useNavigate()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'student-1',
+      title: 'Nouveau cours disponible',
+      message: 'La formation avancée est désormais visible dans le catalogue.',
+      time: 'Il y a 12 min',
+      read: false,
+      path: '/apprenant/catalogue',
+      tone: 'sky',
+    },
+    {
+      id: 'student-2',
+      title: 'Rappel d’inscription',
+      message: 'Vous avez une formation en cours qui demande votre attention.',
+      time: 'Hier',
+      read: false,
+      path: '/apprenant/mes-formations',
+      tone: 'emerald',
+    },
+  ])
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const unreadNotifications = notifications.filter((item) => !item.read).length
+
+  function handleOpenNotifications() {
+    const next = !showNotifications
+    setShowNotifications(next)
+    if (next) {
+      setNotifications((current) => current.map((item) => ({ ...item, read: true })))
+    }
+  }
+
+  function handleNotificationClick(path: string) {
+    setNotifications((current) => current.map((item) => (item.path === path ? { ...item, read: true } : item)))
+    setShowNotifications(false)
+    navigate(path)
+  }
 
   // Pied de sidebar : formation en cours. Données réelles uniquement — en
   // cas d'échec on masque simplement le bloc concerné, jamais de contenu
@@ -356,21 +392,64 @@ export function StudentLayout() {
             {/* 2. NOTIFICATIONS */}
             <div className="relative" ref={notifRef}>
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleOpenNotifications}
                 className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-600 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 aria-label={t('student.notificationsAria')}
               >
                 <Bell size={18} />
+                {unreadNotifications > 0 && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                )}
               </button>
 
               {showNotifications && (
                 <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl animate-[popup-in_0.25s_cubic-bezier(0.16,1,0.3,1)] dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-                    <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">{t('student.notifTitle')}</h3>
-                    <span className="text-[11px] font-medium text-slate-400">{t('student.notifEmpty')}</span>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-900 uppercase dark:text-slate-100">{t('student.notifTitle')}</h3>
+                      {unreadNotifications > 0 && (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                          {unreadNotifications}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNotifications((current) => current.map((item) => ({ ...item, read: true })))}
+                      className="text-[11px] font-medium text-sky-600 hover:underline dark:text-sky-400"
+                    >
+                      {t('student.notifEmpty')}
+                    </button>
                   </div>
-                  <div className="py-6 text-center text-xs text-slate-400">
-                    {t('student.notifEmptyBody')}
+
+                  <div className="space-y-2 py-3">
+                    {notifications.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleNotificationClick(item.path)}
+                        className={`block w-full rounded-xl border p-3 text-left ${
+                          item.tone === 'sky'
+                            ? 'border-sky-100 bg-sky-50/70 dark:border-sky-900/30 dark:bg-sky-500/10'
+                            : 'border-emerald-100 bg-emerald-50/70 dark:border-emerald-900/30 dark:bg-emerald-500/10'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-slate-300 dark:bg-slate-600' : item.tone === 'sky' ? 'bg-sky-500' : 'bg-emerald-500'}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-bold ${item.read ? 'text-slate-700 dark:text-slate-200' : item.tone === 'sky' ? 'text-sky-900 dark:text-sky-200' : 'text-emerald-900 dark:text-emerald-200'}`}>
+                              {item.title}
+                            </p>
+                            <p className={`mt-0.5 text-[11px] ${item.read ? 'text-slate-500 dark:text-slate-400' : item.tone === 'sky' ? 'text-sky-800/80 dark:text-sky-300/80' : 'text-emerald-800/80 dark:text-emerald-300/80'}`}>
+                              {item.message}
+                            </p>
+                            <span className={`mt-1 block text-[10px] font-medium ${item.read ? 'text-slate-500 dark:text-slate-400' : item.tone === 'sky' ? 'text-sky-600 dark:text-sky-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              {item.time}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}

@@ -27,6 +27,15 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=False)
 
+# Chemin de l'admin Django natif — configurable pour ne pas rester sur le
+# chemin par défaut, trivialement devinable en production (défense en
+# profondeur : la vraie protection reste un contrôle réseau — IP allowlist/
+# VPN — devant ce chemin, hors de portée du code applicatif). Toujours
+# terminé par un '/' comme l'exige path().
+ADMIN_URL_PATH = env.str('ADMIN_URL_PATH', default='admin/')
+if not ADMIN_URL_PATH.endswith('/'):
+    ADMIN_URL_PATH += '/'
+
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
 
@@ -54,7 +63,6 @@ INSTALLED_APPS = [
     'trainings',
     'assessments',
     'enrollments',
-    'certifications',
     'assistant',
     'playground',
     'sheets',
@@ -105,6 +113,18 @@ ASGI_APPLICATION = 'config.asgi.application'
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+# Cache pour les tickets WebSocket à usage unique (accounts.views.
+# WebSocketTicketView + core.middleware.JWTAuthMiddleware) et pour le
+# rate-limiting DRF (DEFAULT_THROTTLE_RATES ci-dessous). LocMemCache : même
+# limite mono-process déjà documentée pour CHANNEL_LAYERS ci-dessus — un
+# cache partagé (Redis...) devient nécessaire avec plusieurs workers/process,
+# sinon chaque worker aurait ses propres tickets/compteurs.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     },
 }
 
@@ -160,6 +180,11 @@ STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Limites globales pour les uploads (bytes). Empêche les requêtes contenant
+# des fichiers plus lourds que la valeur configurée d'être entièrement
+# chargées en mémoire. Valeur conseillée pour les vidéos : 100 Mo.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
 
 # Email
 # En dev, les emails (ex. réinitialisation de mot de passe, RF-003) sont
@@ -208,6 +233,33 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 7,
+    # Limitation de débit sur les endpoints sensibles (audit sécurité) : le
+    # cache par défaut (LocMemCache, mémoire du process) suffit tant que le
+    # déploiement reste mono-process (même limite déjà documentée pour
+    # CHANNEL_LAYERS) — passer à un cache partagé (Redis...) devient
+    # nécessaire avec plusieurs workers/process, sinon chaque worker aurait
+    # son propre compteur et la limite globale ne serait plus respectée.
+    'DEFAULT_THROTTLE_RATES': {
+        # Connexion : ralentit une attaque par force brute sur un mot de
+        # passe sans gêner un utilisateur légitime qui se trompe une fois.
+        'login': '5/min',
+        # Demande de réinitialisation de mot de passe : évite le spam
+        # d'emails vers une victime (bombing) tout en laissant une vraie
+        # tentative ratée (faute de frappe sur l'email) repasser vite.
+        'password_reset': '3/hour',
+        # Code de vérification Google à 4 chiffres (10 000 combinaisons,
+        # valable 10 min) : sans cette limite, un script peut les essayer
+        # toutes en quelques secondes. À 5/min, épuiser l'espace prend des
+        # dizaines d'heures — bien au-delà de la fenêtre de validité du code.
+        'google_confirm': '5/min',
+        # Inscription : freine la création de comptes en masse/spam, sans
+        # jamais gêner un usage humain normal.
+        'register': '10/hour',
+        # Émission de tickets WebSocket (voir accounts.views.
+        # WebSocketTicketView) : généreux (une reconnexion réseau normale
+        # en émet plusieurs), mais borné pour éviter un abus délibéré.
+        'ws_ticket': '30/min',
+    },
 }
 
 # djangorestframework-simplejwt (RF-002, RNF-001)

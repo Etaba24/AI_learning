@@ -55,7 +55,6 @@ const FREE_INCLUDED = [
   'Inscription aux formations gratuites',
   'Coach IA sur vos leçons',
   'Suivi de votre progression',
-  'Certificats de fin de formation',
 ]
 
 const FREE_EXCLUDED = [
