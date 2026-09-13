@@ -1,4 +1,5 @@
 import {
+  Atom,
   Boxes,
   Calculator,
   Code2,
@@ -12,7 +13,7 @@ import {
 import { useEffect, useState, type ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '../../api/client'
-import type { MonAbonnement } from '../../api/types'
+import type { MonAbonnement, OutilCode } from '../../api/types'
 import { PremiumOffersModal } from '../../components/PremiumOffersModal'
 
 interface ToolItem {
@@ -22,6 +23,10 @@ interface ToolItem {
   audience: string
   audienceStyle: string
   to?: string
+  // Code outil (voir Outil.Code côté backend) : permet de débloquer cet
+  // outil précis gratuitement via les catégories d'intérêt de l'apprenant,
+  // indépendamment de son abonnement global.
+  code?: OutilCode
 }
 
 // Roadmap honnête : aucun de ces outils n'est encore branché, la page ne
@@ -34,6 +39,7 @@ const UNIVERSAL_TOOLS: ToolItem[] = [
     audience: 'Tous les apprenants',
     audienceStyle: 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400',
     to: '/apprenant/outils/notes',
+    code: 'NOTES',
   },
   {
     icon: Calculator,
@@ -42,6 +48,7 @@ const UNIVERSAL_TOOLS: ToolItem[] = [
     audience: 'Tous les apprenants',
     audienceStyle: 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400',
     to: '/apprenant/outils/calculatrice',
+    code: 'CALCULATRICE',
   },
   {
     icon: PenTool,
@@ -50,6 +57,7 @@ const UNIVERSAL_TOOLS: ToolItem[] = [
     audience: 'Tous les apprenants',
     audienceStyle: 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400',
     to: '/apprenant/outils/tableau-blanc',
+    code: 'TABLEAU_BLANC',
   },
 ]
 
@@ -61,6 +69,7 @@ const SPECIALIZED_TOOLS: ToolItem[] = [
     audience: 'Formations développement',
     audienceStyle: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400',
     to: '/apprenant/outils/ide',
+    code: 'IDE',
   },
   {
     icon: Boxes,
@@ -69,6 +78,16 @@ const SPECIALIZED_TOOLS: ToolItem[] = [
     audience: 'Design & sciences',
     audienceStyle: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     to: '/apprenant/outils/modelisation-3d',
+    code: 'MODELISATION_3D',
+  },
+  {
+    icon: Atom,
+    name: 'Laboratoire de chimie 3D',
+    description: 'Table périodique interactive et rendu 3D ball-and-stick de vraies structures moléculaires (nom ou formule).',
+    audience: 'Formations chimie & sciences',
+    audienceStyle: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
+    to: '/apprenant/outils/chimie-3d',
+    code: 'CHIMIE_3D',
   },
   {
     icon: FileSpreadsheet,
@@ -77,16 +96,17 @@ const SPECIALIZED_TOOLS: ToolItem[] = [
     audience: 'Formations bureautique & gestion',
     audienceStyle: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
     to: '/apprenant/outils/tableur',
+    code: 'TABLEUR',
   },
 ]
 
 function ToolCard({
   tool,
-  isSubscribed,
+  isUnlocked,
   onLockedClick,
 }: {
   tool: ToolItem
-  isSubscribed: boolean
+  isUnlocked: boolean
   onLockedClick: () => void
 }) {
   const Icon = tool.icon
@@ -99,7 +119,7 @@ function ToolCard({
           <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isAvailable ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
             <Icon size={20} />
           </div>
-          {isAvailable && !isSubscribed ? (
+          {isAvailable && !isUnlocked ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
               <Crown size={10} />
               Premium
@@ -128,9 +148,9 @@ function ToolCard({
   const cardClasses =
     'flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-sky-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500/30'
 
-  // Sans abonnement, le clic ouvre le popup des formules sur place —
-  // aucune redirection vers une autre page.
-  if (tool.to && !isSubscribed) {
+  // Ni abonnement ni catégorie qui débloque cet outil : le clic ouvre le
+  // popup des formules sur place — aucune redirection vers une autre page.
+  if (tool.to && !isUnlocked) {
     return (
       <button onClick={onLockedClick} className={`${cardClasses} text-left`}>
         {content}
@@ -148,14 +168,21 @@ function ToolCard({
 }
 
 export function ToolsPage() {
-  const [isSubscribed, setIsSubscribed] = useState(true)
+  const [abonnement, setAbonnement] = useState<MonAbonnement | null>(null)
   const [showOffers, setShowOffers] = useState(false)
 
   useEffect(() => {
     apiFetch<MonAbonnement>('/mon-abonnement/')
-      .then((abonnement) => setIsSubscribed(abonnement.actif))
-      .catch(() => setIsSubscribed(false))
+      .then(setAbonnement)
+      .catch(() => setAbonnement(null))
   }, [])
+
+  // Débloqué soit par un abonnement actif (tous les outils), soit par une
+  // catégorie d'intérêt qui débloque CET outil précis (jamais les autres).
+  function estDebloque(tool: ToolItem): boolean {
+    if (!abonnement) return false
+    return abonnement.actif || Boolean(tool.code && abonnement.outils_gratuits.includes(tool.code))
+  }
 
   return (
     <div className="space-y-8">
@@ -186,7 +213,7 @@ export function ToolsPage() {
         </h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {UNIVERSAL_TOOLS.map((tool) => (
-            <ToolCard key={tool.name} tool={tool} isSubscribed={isSubscribed} onLockedClick={() => setShowOffers(true)} />
+            <ToolCard key={tool.name} tool={tool} isUnlocked={estDebloque(tool)} onLockedClick={() => setShowOffers(true)} />
           ))}
         </div>
       </div>
@@ -198,7 +225,7 @@ export function ToolsPage() {
         </h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {SPECIALIZED_TOOLS.map((tool) => (
-            <ToolCard key={tool.name} tool={tool} isSubscribed={isSubscribed} onLockedClick={() => setShowOffers(true)} />
+            <ToolCard key={tool.name} tool={tool} isUnlocked={estDebloque(tool)} onLockedClick={() => setShowOffers(true)} />
           ))}
         </div>
       </div>

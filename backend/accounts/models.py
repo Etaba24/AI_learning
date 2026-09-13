@@ -33,11 +33,12 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.STUDENT)
 
-    # Obligatoire pour un Formateur (validé dans les serializers, pas ici :
-    # nullable au niveau modèle puisque Apprenant/Admin n'en ont pas besoin).
-    departement = models.ForeignKey(
-        "core.Departement", on_delete=models.PROTECT, null=True, blank=True, related_name="formateurs"
-    )
+    # Un formateur peut appartenir à PLUSIEURS départements (validé dans les
+    # serializers : au moins un requis pour un Formateur, pas pour les
+    # autres rôles). M2M plutôt qu'une FK unique : un formateur enseignant
+    # à cheval sur plusieurs départements n'a pas besoin d'un compte par
+    # département pour créer des formations dans chacun d'eux.
+    departements = models.ManyToManyField("core.Departement", blank=True, related_name="formateurs")
 
     # B2B : membre d'un établissement client (rattaché via code d'invitation
     # à l'inscription). PROTECT : on ne supprime pas un établissement qui a
@@ -59,6 +60,13 @@ class User(AbstractUser):
     # l'email seul pour rattacher un compte. Null pour tout compte créé par
     # mot de passe classique et jamais lié à Google depuis.
     google_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
+
+    # Catégories choisies à l'inscription (apprenant uniquement, en pratique) :
+    # débloquent gratuitement les outils premium associés à chacune (voir
+    # trainings.Category.outils_associes), jamais un abonnement complet.
+    categories_interet = models.ManyToManyField(
+        "trainings.Category", blank=True, related_name="apprenants_interesses"
+    )
 
     # RF-007 : profil consultable/modifiable
     bio = models.TextField(blank=True)

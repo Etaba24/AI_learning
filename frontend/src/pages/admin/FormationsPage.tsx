@@ -5,12 +5,13 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  Trash2,
   UserCog,
   X,
   XCircle,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import {
   DEFAULT_PAGE_SIZE,
@@ -47,7 +48,10 @@ export function FormationsPage() {
   const [pendingCount, setPendingCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FormationStatut | 'ALL'>('ALL')
-  const [searchQuery, setSearchQuery] = useState('')
+  // Pré-rempli depuis la barre de recherche globale du header (?q=...) —
+  // celle-ci redirige ici plutôt que de dupliquer une recherche à part.
+  const [searchParams] = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '')
   const [actionError, setActionError] = useState<string | null>(null)
   const [refusingId, setRefusingId] = useState<string | null>(null)
   const [motif, setMotif] = useState('')
@@ -68,7 +72,17 @@ export function FormationsPage() {
         setFormations(data.results)
         setCount(data.count)
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur inattendue lors du chargement.'))
+      .catch((err) => {
+        // Une suppression peut vider la dernière page affichée : la page
+        // demandée n'existe alors plus (l'API renvoie 404 "Invalid page"),
+        // jamais une vraie erreur — on retombe simplement sur la page
+        // précédente plutôt que d'afficher un écran d'erreur.
+        if (err instanceof ApiError && err.status === 404 && page > 1) {
+          setPage((p) => Math.max(1, p - 1))
+          return
+        }
+        setError(err instanceof ApiError ? err.message : 'Erreur inattendue lors du chargement.')
+      })
   }
 
   // Compte global (toutes pages confondues) des formations en attente de
@@ -152,6 +166,25 @@ export function FormationsPage() {
       } catch (err) {
         showToast('error', err instanceof ApiError ? err.message : 'Erreur lors de la validation.', 'Erreur')
       }
+    }
+  }
+
+  async function handleDelete(formation: Formation) {
+    const ok = await confirm({
+      title: 'Supprimer cette formation ?',
+      message: `"${formation.titre}" sera définitivement supprimée, avec tous ses modules, leçons et supports. Si des apprenants y sont inscrits, leur inscription et leur progression seront elles aussi définitivement effacées. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    })
+    if (!ok) return
+
+    try {
+      await apiFetch(`/formations/${formation.id}/`, { method: 'DELETE' })
+      showToast('success', `"${formation.titre}" a été supprimée.`)
+      if (previewFormation?.id === formation.id) setPreviewFormation(null)
+      loadFormations()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de supprimer cette formation.')
     }
   }
 
@@ -429,6 +462,26 @@ export function FormationsPage() {
                               Dépublier
                             </button>
                           )}
+
+                          {/* ACTION REPUBLIER SI DEPUBLIEE */}
+                          {formation.statut === 'DEPUBLIEE' && (
+                            <button
+                              onClick={() => runAction(formation.id, 'publish')}
+                              className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition-all"
+                            >
+                              <CheckCircle size={13} />
+                              <span>Republier</span>
+                            </button>
+                          )}
+
+                          {/* SUPPRESSION DÉFINITIVE */}
+                          <button
+                            onClick={() => handleDelete(formation)}
+                            className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-400"
+                            title="Supprimer définitivement cette formation"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       )}
                     </td>

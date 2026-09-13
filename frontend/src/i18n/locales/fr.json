@@ -58,6 +58,8 @@
     "emailLabel": "Email",
     "emailPlaceholder": "nom@exemple.com",
     "passwordLabel": "Mot de passe",
+    "categoriesInteretLabel": "Centres d'intérêt (optionnel)",
+    "categoriesInteretHint": "Débloque gratuitement les outils premium liés à ces catégories.",
     "showPassword": "Afficher le mot de passe",
     "hidePassword": "Masquer le mot de passe",
     "submitting": "Un instant...",

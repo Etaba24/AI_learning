@@ -1,6 +1,6 @@
 import { BarChart2, BookOpen, Clock, ArrowRight, Search, Sparkles, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type Niveau, type PaginatedResponse, type PublicFormation } from '../../api/types'
 import { Alert } from '../../components/Alert'
@@ -19,7 +19,9 @@ export function CataloguePage() {
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  // Pré-rempli depuis la barre de recherche globale du header (?q=...).
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') || '')
   const [niveau, setNiveau] = useState<Niveau | 'ALL'>('ALL')
 
   function loadFormations() {

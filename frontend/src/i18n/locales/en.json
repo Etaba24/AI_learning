@@ -58,6 +58,8 @@
     "emailLabel": "Email",
     "emailPlaceholder": "name@example.com",
     "passwordLabel": "Password",
+    "categoriesInteretLabel": "Interests (optional)",
+    "categoriesInteretHint": "Unlocks the premium tools linked to these categories for free.",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "submitting": "One moment...",

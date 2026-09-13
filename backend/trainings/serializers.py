@@ -2,13 +2,30 @@ from accounts.models import User
 from core.models import Departement
 from rest_framework import serializers
 
-from .models import Category, Formation, Lecon, Module, Ressource
+from .models import Category, Formation, Lecon, Module, Outil, Ressource
 
 
-class CategorySerializer(serializers.ModelSerializer):
+class PublicCategorySerializer(serializers.ModelSerializer):
+    """Catégories proposées au choix à l'inscription (RF-001) — juste de
+    quoi afficher la liste, jamais de champ interne (gestion des outils
+    associés reste réservée à CategorySerializer, admin/formateur)."""
+
     class Meta:
         model = Category
         fields = ["id", "nom", "description"]
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    # Codes fixes (voir Outil.Code) plutôt que des PK : le frontend connaît
+    # déjà la liste fermée des 6 outils, pas besoin d'un endpoint à part
+    # pour récupérer leurs ids avant de pouvoir les associer à une catégorie.
+    outils_associes = serializers.SlugRelatedField(
+        many=True, slug_field="code", queryset=Outil.objects.all(), required=False
+    )
+
+    class Meta:
+        model = Category
+        fields = ["id", "nom", "description", "outils_associes"]
 
 
 from assessments.serializers import ExerciceSerializer, QuizSerializer
@@ -117,17 +134,22 @@ class FormationSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         auteur = self.instance.auteur if self.instance else self.context["request"].user
         departement = attrs.get("departement", getattr(self.instance, "departement", None))
-        if (
-            auteur.role == User.Role.INSTRUCTOR
-            and auteur.departement is not None
-            and departement != auteur.departement
-        ):
-            raise serializers.ValidationError(
-                "Un formateur ne peut créer une formation que dans son propre département."
-            )
-        if auteur.role == User.Role.INSTRUCTOR and auteur.departement is None and departement:
-            auteur.departement = departement
-            auteur.save(update_fields=["departement"])
+        if auteur.role != User.Role.INSTRUCTOR:
+            return attrs
+
+        departements_auteur = auteur.departements.all()
+        if departements_auteur.exists():
+            # Un formateur avec au moins un département assigné ne peut
+            # créer une formation que dans l'un d'eux (jamais un autre).
+            if departement not in departements_auteur:
+                raise serializers.ValidationError(
+                    "Un formateur ne peut créer une formation que dans l'un de ses départements."
+                )
+        elif departement:
+            # Amorçage : un formateur sans département encore assigné se
+            # voit attribuer celui de sa toute première formation — ensuite
+            # seul un administrateur peut lui en ajouter d'autres.
+            auteur.departements.add(departement)
         return attrs
 
 
@@ -189,13 +211,44 @@ class PublicFormationDetailSerializer(PublicFormationSerializer):
 
 
 class LeconContenuSerializer(serializers.ModelSerializer):
-    ressources = RessourceSerializer(many=True, read_only=True)
-    exercices = ExerciceSerializer(many=True, read_only=True)
-    quiz = QuizSerializer(many=True, read_only=True)
+    ressources = serializers.SerializerMethodField()
+    exercices = serializers.SerializerMethodField()
+    quiz = serializers.SerializerMethodField()
+    contenu = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+    verrouille = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecon
-        fields = ["id", "titre", "contenu", "video_url", "ordre", "ressources", "exercices", "quiz"]
+        fields = ["id", "titre", "contenu", "video_url", "ordre", "ressources", "exercices", "quiz", "verrouille"]
+
+    def get_verrouille(self, obj):
+        return obj.id in self.context.get("locked_lecon_ids", set())
+
+    # RG-006 (déverrouillage séquentiel) : une leçon verrouillée ne renvoie
+    # jamais son contenu réel — le cadenas côté frontend n'est qu'un
+    # habillage, la vraie barrière est ici (sinon une leçon plus loin dans
+    # le programme reste consultable via l'API même non affichée par l'UI).
+    def get_contenu(self, obj):
+        return "" if self.get_verrouille(obj) else obj.contenu
+
+    def get_video_url(self, obj):
+        return "" if self.get_verrouille(obj) else obj.video_url
+
+    def get_ressources(self, obj):
+        if self.get_verrouille(obj):
+            return []
+        return RessourceSerializer(obj.ressources.all(), many=True).data
+
+    def get_exercices(self, obj):
+        if self.get_verrouille(obj):
+            return []
+        return ExerciceSerializer(obj.exercices.all(), many=True).data
+
+    def get_quiz(self, obj):
+        if self.get_verrouille(obj):
+            return []
+        return QuizSerializer(obj.quiz.all(), many=True).data
 
 
 class ModuleContenuSerializer(serializers.ModelSerializer):

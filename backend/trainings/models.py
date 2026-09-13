@@ -4,11 +4,37 @@ from django.db import models
 from core.models import TimeStampedModel
 
 
+class Outil(models.Model):
+    """Un des outils premium de l'espace apprenant (IDE, tableur, notes...).
+    Ensemble fixe et fermé — ces 6 lignes sont seedées une fois par migration
+    de données, jamais créées depuis l'admin (elles correspondent chacune à
+    une route frontend précise, pas à du contenu géré par un utilisateur)."""
+
+    class Code(models.TextChoices):
+        IDE = "IDE", "IDE (exécution de code)"
+        TABLEUR = "TABLEUR", "Tableur"
+        NOTES = "NOTES", "Notes"
+        CALCULATRICE = "CALCULATRICE", "Calculatrice"
+        TABLEAU_BLANC = "TABLEAU_BLANC", "Tableau blanc"
+        MODELISATION_3D = "MODELISATION_3D", "Modélisation 3D"
+        CHIMIE_3D = "CHIMIE_3D", "Laboratoire de chimie 3D"
+
+    code = models.CharField(max_length=30, choices=Code.choices, unique=True)
+
+    def __str__(self):
+        return self.get_code_display()
+
+
 class Category(TimeStampedModel):
     """RF-018 : gérée par l'administrateur (créer/renommer/supprimer)."""
 
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    # Outils premium débloqués gratuitement pour tout apprenant ayant choisi
+    # cette catégorie parmi ses centres d'intérêt à l'inscription (voir
+    # accounts.RegisterSerializer + billing.services.a_acces_gratuit_outil).
+    # Jamais un abonnement complet — seulement ces outils précis.
+    outils_associes = models.ManyToManyField(Outil, blank=True, related_name="categories")
 
     class Meta:
         verbose_name_plural = "categories"

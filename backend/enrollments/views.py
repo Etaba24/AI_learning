@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,8 +36,9 @@ class InscriptionListCreateView(generics.ListCreateAPIView):
         serializer.save(apprenant=self.request.user)
 
 
-class InscriptionDetailView(generics.RetrieveAPIView):
-    """GET /api/inscriptions/<id>/ — Détails d'une inscription."""
+class InscriptionDetailView(generics.RetrieveDestroyAPIView):
+    """GET /api/inscriptions/<id>/ — Détails d'une inscription.
+    DELETE /api/inscriptions/<id>/ — se désinscrire d'une formation."""
 
     serializer_class = InscriptionSerializer
     permission_classes = [IsAuthenticated]
@@ -53,7 +55,21 @@ class ProgressionUpdateView(APIView):
 
     def post(self, request, inscription_id, lecon_id):
         inscription = get_object_or_404(Inscription, pk=inscription_id, apprenant=request.user)
-        lecon = get_object_or_404(Lecon, pk=lecon_id)
+        # La leçon doit appartenir à LA formation de cette inscription — sans
+        # ce filtre, un apprenant pouvait faire progresser (et donc terminer)
+        # une leçon d'une toute autre formation via son seul id.
+        lecon = get_object_or_404(Lecon, pk=lecon_id, module__formation=inscription.formation)
+
+        # RG-006 : impossible de valider une leçon encore verrouillée — sans
+        # ça, poster directement la progression d'une leçon plus loin dans
+        # le programme suffisait à en déverrouiller la suite sans jamais
+        # avoir terminé les précédentes (le vrai contournement constaté ne
+        # passait pas seulement par l'URL de FormationDetailPage, mais aussi
+        # par cet endpoint, qui ne vérifiait rien).
+        from enrollments.services import get_locked_lecon_ids
+
+        if lecon.id in get_locked_lecon_ids(inscription.formation, inscription):
+            raise PermissionDenied("Cette leçon est verrouillée : terminez les leçons précédentes d'abord.")
 
         video_percent = int(request.data.get("video_progression_percent", 0))
         score = request.data.get("score")

@@ -16,6 +16,11 @@ class ConversationIA(TimeStampedModel):
     lecon = models.ForeignKey(
         Lecon, on_delete=models.SET_NULL, null=True, related_name="conversations_ia"
     )
+    # Leçons supplémentaires de la MÊME formation incluses dans le contexte
+    # envoyé au modèle pour cette question précise (ex: des leçons liées entre
+    # elles pour une meilleure compréhension) — jamais d'une autre formation,
+    # vérifié côté vue (AssistantAskView) avant tout appel au LLM.
+    lecons_associees = models.ManyToManyField(Lecon, related_name="+", blank=True)
     question = models.TextField()
     reponse = models.TextField()
 

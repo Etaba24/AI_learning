@@ -5,8 +5,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const ACCESS_KEY = 'ai_learning_access'
 const REFRESH_KEY = 'ai_learning_refresh'
 
+// sessionStorage (pas localStorage) : la session ne doit jamais survivre à
+// la fermeture du navigateur, quel que soit le rôle — un onglet rouvert
+// après coup doit repasser par /login, pas hériter d'une session active
+// (particulièrement sensible pour un compte admin sur un poste partagé).
+// Reste disponible entre un rechargement de page et une navigation dans le
+// même onglet, contrairement à une variable en mémoire.
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_KEY)
+  return sessionStorage.getItem(ACCESS_KEY)
 }
 
 /** Construit une URL ws(s):// vers le même serveur que l'API REST — même
@@ -19,19 +25,32 @@ export function getWebSocketUrl(path: string): string {
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY)
+  return sessionStorage.getItem(REFRESH_KEY)
 }
 
 export function setTokens(tokens: { access: string; refresh?: string }): void {
-  localStorage.setItem(ACCESS_KEY, tokens.access)
+  sessionStorage.setItem(ACCESS_KEY, tokens.access)
   if (tokens.refresh) {
-    localStorage.setItem(REFRESH_KEY, tokens.refresh)
+    sessionStorage.setItem(REFRESH_KEY, tokens.refresh)
   }
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem(ACCESS_KEY)
-  localStorage.removeItem(REFRESH_KEY)
+  sessionStorage.removeItem(ACCESS_KEY)
+  sessionStorage.removeItem(REFRESH_KEY)
+}
+
+type SessionExpiredHandler = () => void
+let sessionExpiredHandler: SessionExpiredHandler | null = null
+
+/** Point d'ancrage pour AuthContext (ce module n'a pas accès au contexte
+ * React) : appelé une fois la session définitivement morte (jeton invalide
+ * ET rafraîchissement impossible), pour qu'il vide son état `user` — ce qui
+ * fait immédiatement rediriger ProtectedRoute vers /login, avant que la
+ * page en cours ne continue à tourner avec des données qu'elle ne peut
+ * plus charger. */
+export function onSessionExpired(handler: SessionExpiredHandler): void {
+  sessionExpiredHandler = handler
 }
 
 export class ApiError extends Error {
@@ -118,10 +137,30 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     })
 
   let response = await doFetch(skipAuth ? null : getAccessToken())
+  let sessionDead = false
 
-  if (response.status === 401 && !skipAuth && getRefreshToken()) {
-    const newAccessToken = await refreshAccessToken()
-    response = await doFetch(newAccessToken)
+  if (response.status === 401 && !skipAuth) {
+    if (getRefreshToken()) {
+      try {
+        const newAccessToken = await refreshAccessToken()
+        response = await doFetch(newAccessToken)
+        sessionDead = response.status === 401
+      } catch {
+        sessionDead = true
+      }
+    } else {
+      sessionDead = true
+    }
+  }
+
+  // Jeton invalide ET rafraîchissement impossible/refusé : la session est
+  // bel et bien morte. On coupe court ici plutôt que de laisser l'appelant
+  // recevoir une simple erreur 401 qu'il afficherait comme un message
+  // d'échec ordinaire — la priorité absolue est de renvoyer vers /login.
+  if (sessionDead) {
+    clearTokens()
+    sessionExpiredHandler?.()
+    throw new ApiError(401, 'Session expirée, merci de vous reconnecter.')
   }
 
   if (!response.ok) {

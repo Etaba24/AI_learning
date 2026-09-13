@@ -1,12 +1,17 @@
 import { Bot, Send, Sparkles } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
-import type { ConversationIA, Inscription, PaginatedResponse, PublicFormationDetail } from '../../api/types'
+import type { ConversationIA, Inscription, PaginatedResponse, PublicFormationDetail, PublicModule } from '../../api/types'
 
 interface LeconOption {
   id: string
   titre: string
-  moduleTitle: string
+}
+
+interface ModuleOption {
+  id: string
+  titre: string
+  lecons: LeconOption[]
 }
 
 export function CoachIAPage() {
@@ -14,8 +19,15 @@ export function CoachIAPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const [formationId, setFormationId] = useState('')
-  const [lecons, setLecons] = useState<LeconOption[]>([])
+  // Sommaire complet (avant filtrage des leçons verrouillées) — nécessaire
+  // pour recalculer le déverrouillage séquentiel dès que la progression
+  // change, sans devoir tout re-fetch.
+  const [rawModules, setRawModules] = useState<PublicModule[]>([])
+  const [moduleId, setModuleId] = useState('')
   const [leconId, setLeconId] = useState('')
+  // Multi-choix optionnel : d'autres leçons du MÊME module, liées à la
+  // leçon principale, à inclure dans le contexte envoyé à l'IA.
+  const [leconsAssociees, setLeconsAssociees] = useState<string[]>([])
 
   const [history, setHistory] = useState<ConversationIA[] | null>(null)
   const [question, setQuestion] = useState('')
@@ -30,25 +42,62 @@ export function CoachIAPage() {
   }, [])
 
   // Une fois une formation choisie, on va chercher son sommaire (titres des
-  // leçons seulement — le contenu reste côté serveur, RG-009) pour peupler
-  // le sélecteur de leçon.
+  // modules/leçons seulement — le contenu reste côté serveur, RG-009) pour
+  // peupler le sélecteur de module, puis celui de leçon une fois le module choisi.
   useEffect(() => {
+    setModuleId('')
     setLeconId('')
-    setLecons([])
+    setRawModules([])
     if (!formationId) return
 
     apiFetch<PublicFormationDetail>(`/catalogue/formations/${formationId}/`)
-      .then((data) => {
-        const options: LeconOption[] = data.modules.flatMap((module) =>
-          module.lecons.map((lecon) => ({ id: lecon.id, titre: lecon.titre, moduleTitle: module.titre })),
-        )
-        setLecons(options)
-      })
+      .then((data) => setRawModules(data.modules))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }, [formationId])
 
+  const existingInscription = inscriptions?.find((inscription) => inscription.formation === formationId)
+
+  // Même règle de déverrouillage séquentiel que FormationDetailPage (leçon
+  // débloquée si première du module ou précédente terminée) : sans ce
+  // filtre, le sélecteur laissait choisir n'importe quelle leçon plus loin
+  // dans le programme, et le backend répondait simplement par un 403 — le
+  // Coach IA ne doit même pas proposer une leçon pas encore accessible.
+  const completedLessonIds = useMemo(() => {
+    if (!existingInscription) return []
+    const allLessons = rawModules.flatMap((mod) => mod.lecons.map((lec) => lec.id))
+    const completedCount = Math.floor((existingInscription.progress_percent / 100) * allLessons.length)
+    return allLessons.slice(0, completedCount)
+  }, [rawModules, existingInscription])
+
+  const modules: ModuleOption[] = useMemo(() => {
+    return rawModules
+      .map((module, mIdx) => {
+        const prevModule = mIdx > 0 ? rawModules[mIdx - 1] : null
+        const isModuleUnlocked =
+          mIdx === 0 || !prevModule || (prevModule.lecons.length > 0 && prevModule.lecons.every((l) => completedLessonIds.includes(l.id)))
+
+        const lecons: LeconOption[] = !isModuleUnlocked
+          ? []
+          : module.lecons
+              .filter((_lecon, lIdx) => lIdx === 0 || completedLessonIds.includes(module.lecons[lIdx - 1].id))
+              .map((lecon) => ({ id: lecon.id, titre: lecon.titre }))
+
+        return { id: module.id, titre: module.titre, lecons }
+      })
+      .filter((module) => module.lecons.length > 0)
+  }, [rawModules, completedLessonIds])
+
+  const currentModule = modules.find((m) => m.id === moduleId) || null
+  const lecons = useMemo(() => currentModule?.lecons ?? [], [currentModule])
+
+  // Changer de module invalide la leçon choisie dans l'ancien module.
+  useEffect(() => {
+    setLeconId('')
+  }, [moduleId])
+
   // Charge l'historique de conversation propre à la leçon choisie.
   useEffect(() => {
+    setLeconsAssociees([])
     if (!leconId) {
       setHistory(null)
       return
@@ -58,6 +107,12 @@ export function CoachIAPage() {
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Erreur inattendue.'))
   }, [leconId])
 
+  function toggleLeconAssociee(id: string) {
+    setLeconsAssociees((current) =>
+      current.includes(id) ? current.filter((l) => l !== id) : [...current, id],
+    )
+  }
+
   async function handleAsk(event: FormEvent) {
     event.preventDefault()
     if (!question.trim() || !leconId) return
@@ -66,7 +121,7 @@ export function CoachIAPage() {
     try {
       const conversation = await apiFetch<ConversationIA>('/assistant/ask/', {
         method: 'POST',
-        body: { lecon: leconId, question },
+        body: { lecon: leconId, question, lecons_associees: leconsAssociees },
       })
       setHistory((current) => [...(current ?? []), conversation])
       setQuestion('')
@@ -115,21 +170,71 @@ export function CoachIAPage() {
         </select>
 
         <select
+          value={moduleId}
+          onChange={(event) => setModuleId(event.target.value)}
+          disabled={modules.length === 0}
+          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        >
+          <option value="">
+            {formationId ? 'Choisir un module...' : "Sélectionnez d'abord une formation"}
+          </option>
+          {modules.map((module) => (
+            <option key={module.id} value={module.id}>
+              {module.titre}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={leconId}
           onChange={(event) => setLeconId(event.target.value)}
           disabled={lecons.length === 0}
           className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
         >
           <option value="">
-            {formationId ? 'Choisir une leçon...' : 'Sélectionnez d\'abord une formation'}
+            {moduleId ? 'Choisir une leçon...' : "Sélectionnez d'abord un module"}
           </option>
           {lecons.map((lecon) => (
             <option key={lecon.id} value={lecon.id}>
-              {lecon.moduleTitle} — {lecon.titre}
+              {lecon.titre}
             </option>
           ))}
         </select>
       </div>
+
+      {leconId && lecons.length > 1 && (
+        <div className="mb-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+          <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            Autres leçons du module "{currentModule?.titre}" à inclure dans le contexte (optionnel) — utile si
+            plusieurs leçons se complètent pour comprendre le sujet :
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {lecons
+              .filter((lecon) => lecon.id !== leconId)
+              .map((lecon) => {
+                const isChecked = leconsAssociees.includes(lecon.id)
+                return (
+                  <label
+                    key={lecon.id}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      isChecked
+                        ? 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-500/10 dark:text-sky-300'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleLeconAssociee(lecon.id)}
+                      className="sr-only"
+                    />
+                    {lecon.titre}
+                  </label>
+                )
+              })}
+          </div>
+        </div>
+      )}
 
       {!leconId ? (
         <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 py-16 text-center dark:border-slate-800">
@@ -153,6 +258,14 @@ export function CoachIAPage() {
             ) : (
               history.map((conversation) => (
                 <div key={conversation.id} className="space-y-2">
+                  {conversation.lecons_associees.length > 0 && (
+                    <p className="ml-auto max-w-[85%] text-right text-[11px] text-slate-400 dark:text-slate-500">
+                      + {conversation.lecons_associees.length} leçon
+                      {conversation.lecons_associees.length > 1 ? 's' : ''} liée
+                      {conversation.lecons_associees.length > 1 ? 's' : ''} incluse
+                      {conversation.lecons_associees.length > 1 ? 's' : ''}
+                    </p>
+                  )}
                   <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-sky-600 px-4 py-2.5 text-sm text-white">
                     {conversation.question}
                   </div>

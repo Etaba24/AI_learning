@@ -1,8 +1,9 @@
 import { Eye, EyeOff } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
+import type { Category } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { Alert } from '../components/Alert'
 import { GoogleAuthButton } from '../components/GoogleAuthButton'
@@ -44,6 +45,26 @@ export function AuthPage({ initialMode }: AuthPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Centres d'intérêt (optionnel) : débloquent gratuitement les outils
+  // premium associés à chaque catégorie choisie, une fois le compte créé.
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+
+  useEffect(() => {
+    if (mode !== 'register') return
+    // Endpoint volontairement non paginé (liste de référence à cocher en
+    // entier, pas un catalogue à parcourir) : renvoie un tableau brut.
+    apiFetch<Category[]>('/catalogue/categories/', { skipAuth: true })
+      .then(setCategories)
+      .catch(() => setCategories([]))
+  }, [mode])
+
+  function toggleCategory(id: string) {
+    setSelectedCategories((current) =>
+      current.includes(id) ? current.filter((c) => c !== id) : [...current, id],
+    )
+  }
 
   // Étape "vérification" : Google a confirmé un email encore inconnu de la
   // plateforme -> un code à 4 chiffres part par email avant toute création
@@ -163,6 +184,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
             first_name: firstName,
             last_name: lastName,
             role: 'STUDENT',
+            categories_interet: selectedCategories,
           },
         })
       }
@@ -177,7 +199,7 @@ export function AuthPage({ initialMode }: AuthPageProps) {
 
   return (
     <div
-      className={`relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 transition-colors duration-200 ${
+      className={`relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto px-4 py-12 transition-colors duration-200 ${
         theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-sky-50 text-slate-900'
       }`}
     >
@@ -228,8 +250,13 @@ export function AuthPage({ initialMode }: AuthPageProps) {
         </div>
 
         {/* ================= PANNEAU FORMULAIRE ================= */}
+        {/* sm:inset-y-0 fixe la hauteur de ce panneau à celle de la carte
+            (les éléments en absolute ne contribuent pas à la hauteur du
+            parent) : sans overflow-y-auto ici, un formulaire plus haut que
+            la carte (ex: la liste de catégories à l'inscription) est
+            simplement coupé, sans aucun moyen de le faire défiler. */}
         <div
-          className={`w-full px-8 py-12 transition-transform duration-700 ease-in-out sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 ${
+          className={`w-full overflow-y-auto px-8 py-12 transition-transform duration-700 ease-in-out sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 ${
             theme === 'dark' ? 'bg-slate-900' : 'bg-white'
           } ${mode === 'register' ? 'sm:translate-x-full' : 'sm:translate-x-0'}`}
         >
@@ -428,6 +455,42 @@ export function AuthPage({ initialMode }: AuthPageProps) {
                 </button>
               </div>
             </div>
+
+            {mode === 'register' && categories.length > 0 && (
+              <div>
+                <label className={`mb-1 block text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('auth.categoriesInteretLabel')}
+                </label>
+                <p className={`mb-2 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {t('auth.categoriesInteretHint')}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((category) => {
+                    const isChecked = selectedCategories.includes(category.id)
+                    return (
+                      <label
+                        key={category.id}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isChecked
+                            ? 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-500/10 dark:text-sky-300'
+                            : theme === 'dark'
+                              ? 'border-slate-700 text-slate-300 hover:border-slate-600'
+                              : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCategory(category.id)}
+                          className="sr-only"
+                        />
+                        {category.nom}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

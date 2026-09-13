@@ -8,12 +8,13 @@ import {
   Eye,
   Layers,
   Send,
+  Trash2,
   X,
   ShieldCheck,
   Info,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import {
   DEFAULT_PAGE_SIZE,
@@ -43,7 +44,9 @@ export function InstructorFormationsPage() {
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  // Pré-rempli depuis la barre de recherche globale du header (?q=...).
+  const [searchParams] = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '')
   const [selectedStatut, setSelectedStatut] = useState<string>('TOUS')
 
   // Modale de gestion des modules & leçons par le formateur
@@ -62,7 +65,17 @@ export function InstructorFormationsPage() {
         setFormations(data.results)
         setCount(data.count)
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des cours.'))
+      .catch((err) => {
+        // Une suppression peut vider la dernière page affichée : la page
+        // demandée n'existe alors plus (l'API renvoie 404 "Invalid page"),
+        // jamais une vraie erreur — on retombe simplement sur la page
+        // précédente plutôt que d'afficher un écran d'erreur.
+        if (err instanceof ApiError && err.status === 404 && page > 1) {
+          setPage((p) => Math.max(1, p - 1))
+          return
+        }
+        setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des cours.')
+      })
   }
 
   useEffect(() => {
@@ -93,6 +106,34 @@ export function InstructorFormationsPage() {
       } catch (err) {
         showToast('error', err instanceof ApiError ? err.message : 'Erreur lors de la soumission de la formation.', 'Erreur')
       }
+    }
+  }
+
+  async function handleRepublish(formation: Formation) {
+    try {
+      await apiFetch(`/formations/${formation.id}/publish/`, { method: 'POST' })
+      showToast('success', `"${formation.titre}" est de nouveau publiée.`, 'Republication réussie !')
+      loadFormations()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de republier cette formation.', 'Erreur')
+    }
+  }
+
+  async function handleDelete(formation: Formation) {
+    const ok = await confirm({
+      title: 'Supprimer cette formation ?',
+      message: `"${formation.titre}" sera définitivement supprimée, avec tous ses modules, leçons et supports. Si des apprenants y sont inscrits, leur inscription et leur progression seront elles aussi définitivement effacées. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+      danger: true,
+    })
+    if (!ok) return
+
+    try {
+      await apiFetch(`/formations/${formation.id}/`, { method: 'DELETE' })
+      showToast('success', `"${formation.titre}" a été supprimée.`)
+      loadFormations()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de supprimer cette formation.')
     }
   }
 
@@ -216,12 +257,22 @@ export function InstructorFormationsPage() {
                     {f.categorie_nom}
                   </span>
 
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUT_BADGE_STYLES[f.statut]
-                      }`}
-                  >
-                    {STATUT_LABELS[f.statut]}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${STATUT_BADGE_STYLES[f.statut]
+                        }`}
+                    >
+                      {STATUT_LABELS[f.statut]}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(f)}
+                      className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+                      title="Supprimer définitivement cette formation"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
 
                 <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
@@ -260,6 +311,23 @@ export function InstructorFormationsPage() {
                     <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
                       <CheckCircle2 size={14} />
                       <span>✅ Validé & En ligne pour les étudiants</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* INDICATION DE STATUT DEPUBLIEE */}
+                {f.statut === 'DEPUBLIEE' && (
+                  <div className="mt-3.5 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Retirée du catalogue</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRepublish(f)}
+                        className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-extrabold text-white hover:bg-emerald-700"
+                      >
+                        <CheckCircle2 size={12} />
+                        Republier
+                      </button>
                     </div>
                   </div>
                 )}

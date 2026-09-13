@@ -24,4 +24,5 @@ urlpatterns = [
     path("lecons/<uuid:lecon_id>/ressources/<uuid:pk>/", views.RessourceDetailView.as_view(), name="ressource-detail"),
     path("catalogue/formations/", views.PublicFormationListView.as_view(), name="catalogue-list"),
     path("catalogue/formations/<uuid:pk>/", views.PublicFormationDetailView.as_view(), name="catalogue-detail"),
+    path("catalogue/categories/", views.PublicCategoryListView.as_view(), name="catalogue-categories"),
 ]

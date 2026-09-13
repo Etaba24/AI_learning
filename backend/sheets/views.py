@@ -1,7 +1,8 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
-from billing.permissions import HasActiveSubscription
+from billing.permissions import HasToolAccess
+from trainings.models import Outil
 
 from core.utils import log_activity
 
@@ -13,7 +14,8 @@ class ClasseurListCreateView(generics.ListCreateAPIView):
     """GET /api/classeurs/ (liste, sans données) — POST /api/classeurs/.
     Chacun ne voit et ne manipule que ses propres classeurs."""
 
-    permission_classes = [IsAuthenticated, HasActiveSubscription]
+    permission_classes = [IsAuthenticated, HasToolAccess]
+    outil_code = Outil.Code.TABLEUR
 
     def get_serializer_class(self):
         if self.request.method == "GET":
@@ -33,7 +35,8 @@ class ClasseurDetailView(generics.RetrieveUpdateDestroyAPIView):
     (le queryset filtré renvoie un 404 pour le classeur d'un autre)."""
 
     serializer_class = ClasseurSerializer
-    permission_classes = [IsAuthenticated, HasActiveSubscription]
+    permission_classes = [IsAuthenticated, HasToolAccess]
+    outil_code = Outil.Code.TABLEUR
 
     def get_queryset(self):
         return Classeur.objects.filter(proprietaire=self.request.user)

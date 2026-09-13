@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'billing',
     'messaging',
     'library',
+    'chemistry',
 ]
 
 MIDDLEWARE = [
@@ -259,6 +260,10 @@ REST_FRAMEWORK = {
         # WebSocketTicketView) : généreux (une reconnexion réseau normale
         # en émet plusieurs), mais borné pour éviter un abus délibéré.
         'ws_ticket': '30/min',
+        # Recherche de molécule (chemistry.views.MoleculeSearchView) : proxy
+        # vers l'API publique PubChem — limité pour ne pas en abuser côté
+        # tiers, tout en restant confortable pour un usage normal.
+        'molecule_search': '30/min',
     },
 }
 

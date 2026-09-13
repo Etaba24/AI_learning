@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { apiFetch, clearTokens, getAccessToken, setTokens } from '../api/client'
+import { apiFetch, clearTokens, getAccessToken, getRefreshToken, onSessionExpired, setTokens } from '../api/client'
 import type { MonAbonnement, User } from '../api/types'
+import { useToast } from '../components/ToastContext'
 
 interface AuthContextValue {
   user: User | null
@@ -26,12 +27,27 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { showToast } = useToast()
   const [user, setUser] = useState<User | null>(null)
-  // Tant qu'on n'a pas vérifié s'il y a un token valide en localStorage, on
+  // Tant qu'on n'a pas vérifié s'il y a un token valide en sessionStorage, on
   // ne sait pas encore si l'utilisateur est connecté -> évite un flash vers
   // /login au rechargement de page alors qu'une session existe déjà.
   const [isLoading, setIsLoading] = useState(true)
   const [abonnement, setAbonnement] = useState<MonAbonnement | null>(null)
+
+  // Point d'ancrage utilisé par api/client.ts (qui n'a pas accès au contexte
+  // React) : dès qu'une requête authentifiée constate que la session est
+  // morte (jeton invalide + rafraîchissement impossible), on vide `user`
+  // immédiatement — ProtectedRoute redirige alors vers /login avant que la
+  // page en cours ne continue à tourner avec des données qu'elle ne peut
+  // plus charger.
+  useEffect(() => {
+    onSessionExpired(() => {
+      setUser(null)
+      setAbonnement(null)
+      showToast('error', 'Votre session a expiré, merci de vous reconnecter.')
+    })
+  }, [showToast])
 
   async function loadAbonnement() {
     try {
@@ -83,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout(): Promise<void> {
     try {
-      const refresh = localStorage.getItem('ai_learning_refresh')
+      const refresh = getRefreshToken()
       if (refresh) {
         await apiFetch('/auth/logout/', {
           method: 'POST',

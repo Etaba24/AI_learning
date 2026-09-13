@@ -1,10 +1,12 @@
-import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, PlayCircle, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, BookOpen, CheckCircle2, GraduationCap, LogOut, PlayCircle, Sparkles } from 'lucide-react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type Inscription, type PaginatedResponse } from '../../api/types'
 import { Alert } from '../../components/Alert'
+import { useConfirm } from '../../components/ConfirmContext'
 import { Pagination } from '../../components/Pagination'
+import { useToast } from '../../components/ToastContext'
 import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 
 const STATUT_LABELS: Record<Inscription['statut'], string> = {
@@ -20,6 +22,8 @@ const STATUT_STYLES: Record<Inscription['statut'], string> = {
 }
 
 export function MyCoursesPage() {
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [inscriptions, setInscriptions] = useState<Inscription[] | null>(null)
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -36,6 +40,27 @@ export function MyCoursesPage() {
 
   useEffect(loadInscriptions, [page])
   useRealtimeTopics(['mes_formations'], loadInscriptions)
+
+  async function handleUnsubscribe(event: MouseEvent, inscription: Inscription) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const ok = await confirm({
+      title: 'Se désinscrire de cette formation ?',
+      message: `Vous perdrez votre progression sur « ${inscription.formation_titre} ». Cette action est irréversible.`,
+      confirmLabel: 'Se désinscrire',
+      danger: true,
+    })
+    if (!ok) return
+
+    try {
+      await apiFetch(`/inscriptions/${inscription.id}/`, { method: 'DELETE' })
+      showToast('success', 'Vous avez été désinscrit de cette formation.')
+      loadInscriptions()
+    } catch (err) {
+      showToast('error', err instanceof ApiError ? err.message : 'Impossible de vous désinscrire.')
+    }
+  }
 
   if (error) {
     return <Alert variant="error" message={error} />
@@ -149,7 +174,15 @@ export function MyCoursesPage() {
                 </div>
               </div>
 
-              <div className="mt-4 sm:mt-0 shrink-0">
+              <div className="mt-4 flex shrink-0 items-center gap-2 sm:mt-0">
+                <button
+                  type="button"
+                  onClick={(event) => handleUnsubscribe(event, inscription)}
+                  title="Se désinscrire de cette formation"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                >
+                  <LogOut size={16} />
+                </button>
                 <span className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-bold text-slate-700 transition-all group-hover:border-sky-500 group-hover:bg-sky-500 group-hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:group-hover:bg-sky-600">
                   <PlayCircle size={16} />
                   Continuer le cours

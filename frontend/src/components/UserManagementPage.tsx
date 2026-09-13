@@ -23,10 +23,10 @@ interface FormState {
   last_name: string
   email: string
   password: string
-  departement: string
+  departements: string[]
 }
 
-const EMPTY_FORM: FormState = { id: null, first_name: '', last_name: '', email: '', password: '', departement: '' }
+const EMPTY_FORM: FormState = { id: null, first_name: '', last_name: '', email: '', password: '', departements: [] }
 
 /** CRUD complet réutilisé par ApprenantsPage et FormateursPage */
 export function UserManagementPage({ role, title, createLabel, emptyMessage, requireDepartement }: UserManagementPageProps) {
@@ -64,7 +64,7 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
   }, [requireDepartement])
 
   function openCreateModal() {
-    setForm({ ...EMPTY_FORM, departement: departements[0]?.id ?? '' })
+    setForm({ ...EMPTY_FORM })
     setFormError(null)
     setIsModalOpen(true)
   }
@@ -76,10 +76,19 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
       last_name: user.last_name,
       email: user.email,
       password: '',
-      departement: user.departement ?? '',
+      departements: user.departements,
     })
     setFormError(null)
     setIsModalOpen(true)
+  }
+
+  function toggleDepartement(id: string) {
+    setForm((f) => ({
+      ...f,
+      departements: f.departements.includes(id)
+        ? f.departements.filter((d) => d !== id)
+        : [...f.departements, id],
+    }))
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -94,7 +103,7 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
             first_name: form.first_name,
             last_name: form.last_name,
             email: form.email,
-            ...(requireDepartement ? { departement: form.departement } : {}),
+            ...(requireDepartement ? { departements: form.departements } : {}),
           },
         })
         showToast('success', 'Compte modifié avec succès.')
@@ -107,7 +116,7 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
             email: form.email,
             password: form.password,
             role,
-            ...(requireDepartement ? { departement: form.departement } : {}),
+            ...(requireDepartement ? { departements: form.departements } : {}),
           },
         })
         showToast('success', 'Compte créé avec succès.')
@@ -229,10 +238,17 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
 
                       {requireDepartement && (
                         <td className="py-4 px-6">
-                          {user.departement_nom ? (
-                            <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                              {user.departement_nom}
-                            </span>
+                          {user.departements_noms.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {user.departements_noms.map((nom) => (
+                                <span
+                                  key={nom}
+                                  className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                >
+                                  {nom}
+                                </span>
+                              ))}
+                            </div>
                           ) : (
                             <span className="text-slate-400 italic">—</span>
                           )}
@@ -352,21 +368,35 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
           {requireDepartement && (
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
-                Département
+                Départements (au moins un)
               </label>
-              <select
-                required
-                value={form.departement}
-                onChange={(event) => setForm((f) => ({ ...f, departement: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              >
-                {departements.length === 0 && <option value="">Aucun département — créez-en un d'abord</option>}
-                {departements.map((departement) => (
-                  <option key={departement.id} value={departement.id}>
-                    {departement.nom}
-                  </option>
-                ))}
-              </select>
+              {departements.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Aucun département — créez-en un d'abord.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {departements.map((departement) => {
+                    const isChecked = form.departements.includes(departement.id)
+                    return (
+                      <label
+                        key={departement.id}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          isChecked
+                            ? 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-500/10 dark:text-sky-300'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleDepartement(departement.id)}
+                          className="sr-only"
+                        />
+                        {departement.nom}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -397,7 +427,7 @@ export function UserManagementPage({ role, title, createLabel, emptyMessage, req
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || (requireDepartement && form.departements.length === 0)}
             className="w-full rounded-lg bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
           >
             {isSubmitting ? 'Enregistrement...' : form.id ? 'Enregistrer' : 'Créer le compte'}

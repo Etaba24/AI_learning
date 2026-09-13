@@ -345,7 +345,10 @@ export function InteractiveLessonViewer({
             disabled={!isValidationAllowed}
             className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-3 text-xs font-extrabold uppercase tracking-wide text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-all"
           >
-            <span>Valider et leçon suivante</span>
+            {/* Dernière leçon du module : plus aucune leçon suivante DANS ce
+                module, donc on valide/termine le module plutôt que de
+                promettre une "leçon suivante" qui n'existe pas ici. */}
+            <span>{leconIndex >= totalLeconsInModule ? 'Terminer le module' : 'Valider et leçon suivante'}</span>
             <ArrowRight size={16} />
           </button>
         )}

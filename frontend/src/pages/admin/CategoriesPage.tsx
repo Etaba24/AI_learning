@@ -1,7 +1,13 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
-import { DEFAULT_PAGE_SIZE, type Category, type PaginatedResponse } from '../../api/types'
+import {
+  DEFAULT_PAGE_SIZE,
+  OUTIL_LABELS,
+  type Category,
+  type OutilCode,
+  type PaginatedResponse,
+} from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { useConfirm } from '../../components/ConfirmContext'
 import { Modal } from '../../components/Modal'
@@ -13,9 +19,11 @@ interface FormState {
   id: string | null
   nom: string
   description: string
+  outilsAssocies: OutilCode[]
 }
 
-const EMPTY_FORM: FormState = { id: null, nom: '', description: '' }
+const EMPTY_FORM: FormState = { id: null, nom: '', description: '', outilsAssocies: [] }
+const TOUS_LES_OUTILS = Object.keys(OUTIL_LABELS) as OutilCode[]
 
 export function CategoriesPage() {
   const { showToast } = useToast()
@@ -50,9 +58,23 @@ export function CategoriesPage() {
   }
 
   function openEditModal(category: Category) {
-    setForm({ id: category.id, nom: category.nom, description: category.description })
+    setForm({
+      id: category.id,
+      nom: category.nom,
+      description: category.description,
+      outilsAssocies: category.outils_associes || [],
+    })
     setFormError(null)
     setIsModalOpen(true)
+  }
+
+  function toggleOutil(code: OutilCode) {
+    setForm((f) => ({
+      ...f,
+      outilsAssocies: f.outilsAssocies.includes(code)
+        ? f.outilsAssocies.filter((c) => c !== code)
+        : [...f.outilsAssocies, code],
+    }))
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -60,17 +82,12 @@ export function CategoriesPage() {
     setFormError(null)
     setIsSubmitting(true)
     try {
+      const body = { nom: form.nom, description: form.description, outils_associes: form.outilsAssocies }
       if (form.id) {
-        await apiFetch(`/categories/${form.id}/`, {
-          method: 'PATCH',
-          body: { nom: form.nom, description: form.description },
-        })
+        await apiFetch(`/categories/${form.id}/`, { method: 'PATCH', body })
         showToast('success', 'Catégorie modifiée avec succès.')
       } else {
-        await apiFetch('/categories/', {
-          method: 'POST',
-          body: { nom: form.nom, description: form.description },
-        })
+        await apiFetch('/categories/', { method: 'POST', body })
         showToast('success', 'Catégorie créée avec succès.')
       }
       setIsModalOpen(false)
@@ -212,6 +229,37 @@ export function CategoriesPage() {
               onChange={(event) => setForm((f) => ({ ...f, description: event.target.value }))}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
+              Outils débloqués gratuitement (sans abonnement)
+            </label>
+            <p className="mb-2 text-xs text-slate-400">
+              Un apprenant ayant choisi cette catégorie à l'inscription a accès gratuitement à ces outils.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {TOUS_LES_OUTILS.map((code) => {
+                const isChecked = form.outilsAssocies.includes(code)
+                return (
+                  <label
+                    key={code}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isChecked
+                        ? 'border-sky-500 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-500/10 dark:text-sky-300'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleOutil(code)}
+                      className="sr-only"
+                    />
+                    {OUTIL_LABELS[code]}
+                  </label>
+                )
+              })}
+            </div>
           </div>
           <button
             type="submit"

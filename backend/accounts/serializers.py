@@ -1,6 +1,9 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from core.models import Departement
+from trainings.models import Category
+
 from .models import User
 
 
@@ -13,10 +16,30 @@ class RegisterSerializer(serializers.ModelSerializer):
     # B2B : code partagé par un établissement à ses membres. Optionnel —
     # sans code, inscription grand public classique.
     code_etablissement = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # Centres d'intérêt (apprenant) : débloquent gratuitement les outils
+    # premium associés à chaque catégorie choisie (jamais un abonnement
+    # complet) — voir trainings.Category.outils_associes.
+    categories_interet = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Category.objects.all(), required=False, default=list
+    )
+    # Un formateur peut appartenir à plusieurs départements (au moins un
+    # requis — voir validate() ci-dessous) ; sans objet pour un apprenant.
+    departements = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Departement.objects.all(), required=False, default=list
+    )
 
     class Meta:
         model = User
-        fields = ["email", "password", "first_name", "last_name", "role", "departement", "code_etablissement"]
+        fields = [
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+            "role",
+            "departements",
+            "code_etablissement",
+            "categories_interet",
+        ]
 
     def validate_code_etablissement(self, value):
         if not value:
@@ -46,19 +69,29 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # Un formateur doit appartenir à un département ; un apprenant n'en
-        # a pas besoin (le champ reste vide pour lui).
-        if attrs.get("role") == User.Role.INSTRUCTOR and not attrs.get("departement"):
-            raise serializers.ValidationError({"departement": "Un formateur doit appartenir à un département."})
+        # Un formateur doit appartenir à au moins un département ; un
+        # apprenant n'en a pas besoin (le champ reste vide pour lui).
+        if attrs.get("role") == User.Role.INSTRUCTOR and not attrs.get("departements"):
+            raise serializers.ValidationError(
+                {"departements": "Un formateur doit appartenir à au moins un département."}
+            )
         return attrs
 
     def create(self, validated_data):
         # validate_code_etablissement a déjà transformé le code en objet.
         etablissement = validated_data.pop("code_etablissement", None)
+        # M2M : ne peuvent être posés qu'après la création (l'instance a
+        # besoin d'un pk), donc retirés ici puis appliqués via .set() ensuite.
+        categories_interet = validated_data.pop("categories_interet", [])
+        departements = validated_data.pop("departements", [])
         user = User.objects.create_user(**validated_data)
         if etablissement:
             user.etablissement = etablissement
             user.save(update_fields=["etablissement"])
+        if categories_interet:
+            user.categories_interet.set(categories_interet)
+        if departements:
+            user.departements.set(departements)
         return user
 
 
@@ -68,7 +101,7 @@ class UserSerializer(serializers.ModelSerializer):
     changer lui-même depuis son profil."""
 
     etablissement_nom = serializers.CharField(source="etablissement.nom", read_only=True, default=None)
-    departement_nom = serializers.CharField(source="departement.nom", read_only=True, default=None)
+    departements_noms = serializers.SlugRelatedField(source="departements", slug_field="nom", many=True, read_only=True)
 
     class Meta:
         model = User
@@ -81,7 +114,7 @@ class UserSerializer(serializers.ModelSerializer):
             "bio",
             "avatar_url",
             "etablissement_nom",
-            "departement_nom",
+            "departements_noms",
             "date_joined",
         ]
         read_only_fields = ["id", "email", "role", "etablissement_nom", "date_joined"]
@@ -95,7 +128,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
     serializer (pas de champ password) : seul le titulaire du compte le
     fait, via le flux de réinitialisation."""
 
-    departement_nom = serializers.CharField(source="departement.nom", read_only=True, default=None)
+    departements_noms = serializers.SlugRelatedField(source="departements", slug_field="nom", many=True, read_only=True)
 
     class Meta:
         model = User
@@ -106,8 +139,8 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "is_active",
-            "departement",
-            "departement_nom",
+            "departements",
+            "departements_noms",
             "bio",
             "avatar_url",
             "date_joined",
@@ -116,9 +149,16 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         role = attrs.get("role", getattr(self.instance, "role", None))
-        departement = attrs.get("departement", getattr(self.instance, "departement", None))
-        if role == User.Role.INSTRUCTOR and not departement:
-            raise serializers.ValidationError({"departement": "Un formateur doit appartenir à un département."})
+        if "departements" in attrs:
+            departements = attrs.get("departements")
+        elif self.instance:
+            departements = list(self.instance.departements.all())
+        else:
+            departements = None
+        if role == User.Role.INSTRUCTOR and not departements:
+            raise serializers.ValidationError(
+                {"departements": "Un formateur doit appartenir à au moins un département."}
+            )
         return attrs
 
 

@@ -41,6 +41,7 @@ import { FormationDetailPage } from './pages/student/FormationDetailPage'
 import { IdePage } from './pages/student/IdePage'
 import { LibraryPage } from './pages/student/LibraryPage'
 import { MessagerieChatPage } from './pages/student/MessagerieChatPage'
+import { ChimiePage } from './pages/student/ChimiePage'
 import { Modelisation3DPage } from './pages/student/Modelisation3DPage'
 import { MyCoursesPage } from './pages/student/MyCoursesPage'
 import { NewsPage } from './pages/student/NewsPage'
@@ -137,12 +138,13 @@ function App() {
             <Route path="bibliotheque" element={<LibraryPage />} />
             <Route path="abonnement" element={<AbonnementPage />} />
             <Route path="outils" element={<ToolsPage />} />
-            <Route path="outils/ide" element={<PremiumGate><IdePage /></PremiumGate>} />
-            <Route path="outils/tableur" element={<PremiumGate><TableurPage /></PremiumGate>} />
-            <Route path="outils/notes" element={<PremiumGate><NotesPage /></PremiumGate>} />
-            <Route path="outils/calculatrice" element={<PremiumGate><CalculatricePage /></PremiumGate>} />
-            <Route path="outils/tableau-blanc" element={<PremiumGate><TableauBlancPage /></PremiumGate>} />
-            <Route path="outils/modelisation-3d" element={<PremiumGate><Modelisation3DPage /></PremiumGate>} />
+            <Route path="outils/ide" element={<PremiumGate tool="IDE"><IdePage /></PremiumGate>} />
+            <Route path="outils/tableur" element={<PremiumGate tool="TABLEUR"><TableurPage /></PremiumGate>} />
+            <Route path="outils/notes" element={<PremiumGate tool="NOTES"><NotesPage /></PremiumGate>} />
+            <Route path="outils/calculatrice" element={<PremiumGate tool="CALCULATRICE"><CalculatricePage /></PremiumGate>} />
+            <Route path="outils/tableau-blanc" element={<PremiumGate tool="TABLEAU_BLANC"><TableauBlancPage /></PremiumGate>} />
+            <Route path="outils/modelisation-3d" element={<PremiumGate tool="MODELISATION_3D"><Modelisation3DPage /></PremiumGate>} />
+            <Route path="outils/chimie-3d" element={<PremiumGate tool="CHIMIE_3D"><ChimiePage /></PremiumGate>} />
             <Route path="parametres" element={<ParametresPage />} />
           </Route>
         </Route>

@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/', include('billing.urls')),
     path('api/', include('messaging.urls')),
     path('api/', include('library.urls')),
+    path('api/', include('chemistry.urls')),
 ]
 
 # Sert les fichiers déposés (PDF/EPUB) en développement — en production, un

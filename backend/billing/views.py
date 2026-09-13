@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from accounts.models import User
 from accounts.permissions import IsAdmin, IsEtablissementAdmin
 from core.utils import log_activity
+from trainings.models import Outil
 
 from .models import Abonnement, Classe, Etablissement, Filiere, Plan, ResponsableInvitationCode
 from .serializers import (
@@ -488,14 +489,32 @@ class MonAbonnementView(APIView):
     """GET /api/mon-abonnement/ — ce que l'utilisateur connecté voit de sa
     situation : couvert ou non, par quel plan, jusqu'à quand, à quel titre
     (personnel ou via son établissement). C'est la source du badge premium
-    côté frontend — mais le vrai contrôle reste HasActiveSubscription."""
+    côté frontend — mais le vrai contrôle reste HasActiveSubscription /
+    HasToolAccess. `outils_gratuits` : outils débloqués sans abonnement via
+    les catégories d'intérêt choisies à l'inscription (RG : jamais tout
+    l'abonnement, seulement ces outils précis)."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        outils_gratuits = list(
+            Outil.objects.filter(categories__apprenants_interesses=request.user)
+            .values_list("code", flat=True)
+            .distinct()
+        )
+
         abonnement = abonnement_actif_pour(request.user)
         if not abonnement:
-            return Response({"actif": False, "via": None, "plan": None, "date_fin": None, "abonnement_id": None})
+            return Response(
+                {
+                    "actif": False,
+                    "via": None,
+                    "plan": None,
+                    "date_fin": None,
+                    "abonnement_id": None,
+                    "outils_gratuits": outils_gratuits,
+                }
+            )
         return Response(
             {
                 "actif": True,
@@ -506,6 +525,7 @@ class MonAbonnementView(APIView):
                 # titulaire (retrograder) — jamais celui d'un établissement,
                 # qu'il ne gère pas lui-même.
                 "abonnement_id": abonnement.id if not abonnement.etablissement_id else None,
+                "outils_gratuits": outils_gratuits,
             }
         )
 

@@ -20,6 +20,7 @@ from .serializers import (
     FormationSerializer,
     LeconSerializer,
     ModuleSerializer,
+    PublicCategorySerializer,
     PublicFormationDetailSerializer,
     PublicFormationSerializer,
     RessourceSerializer,
@@ -32,6 +33,19 @@ class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsInstructorOrAdmin]
+
+
+class PublicCategoryListView(generics.ListAPIView):
+    """GET /api/catalogue/categories/ — catégories proposées au choix à
+    l'inscription (RF-001), publiques : pas encore de compte à ce stade.
+    Jamais paginé : c'est une liste de référence à cocher en entier dans le
+    formulaire, pas un catalogue à parcourir page par page — paginer ferait
+    silencieusement disparaître les catégories au-delà de la 1re page."""
+
+    queryset = Category.objects.all()
+    serializer_class = PublicCategorySerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
 
 
 class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -87,6 +101,17 @@ class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
             queryset = queryset.filter(auteur=user)
         return queryset
 
+    def destroy(self, request, *args, **kwargs):
+        # Suppression autorisée même si des apprenants sont inscrits (choix
+        # explicite du produit) : Inscription.formation est en CASCADE, donc
+        # leur historique d'inscription/progression est effacé avec elle —
+        # assumé, pas une conséquence cachée (le frontend prévient avant).
+        formation = self.get_object()
+        formation_titre = formation.titre
+        response = super().destroy(request, *args, **kwargs)
+        log_activity(request.user, "FORMATION_SUPPRIMEE", formation_titre)
+        return response
+
 
 class FormationContenuView(generics.RetrieveAPIView):
     """GET /api/formations/<id>/contenu/ — contenu pédagogique COMPLET
@@ -105,6 +130,7 @@ class FormationContenuView(generics.RetrieveAPIView):
     def get_object(self):
         formation = get_object_or_404(Formation.objects.select_related("auteur"), pk=self.kwargs["pk"])
         user = self.request.user
+        self.locked_lecon_ids = set()
 
         if user.role == User.Role.ADMIN:
             return formation
@@ -112,13 +138,25 @@ class FormationContenuView(generics.RetrieveAPIView):
             return formation
 
         from enrollments.models import Inscription
+        from enrollments.services import get_locked_lecon_ids
 
-        if Inscription.objects.filter(apprenant=user, formation=formation).exists():
-            return formation
+        inscription = Inscription.objects.filter(apprenant=user, formation=formation).first()
+        if inscription is None:
+            raise PermissionDenied(
+                "Vous devez être inscrit à cette formation pour en consulter le contenu."
+            )
 
-        raise PermissionDenied(
-            "Vous devez être inscrit à cette formation pour en consulter le contenu."
-        )
+        # RG-006 : le déverrouillage séquentiel des modules/leçons est
+        # imposé ici, pas seulement affiché côté frontend — sans ça, une
+        # leçon plus loin dans le programme restait consultable via l'API
+        # même verrouillée dans l'interface (contournement constaté).
+        self.locked_lecon_ids = get_locked_lecon_ids(formation, inscription)
+        return formation
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["locked_lecon_ids"] = getattr(self, "locked_lecon_ids", set())
+        return context
 
 
 class _FormationTransitionView(APIView):
@@ -202,7 +240,9 @@ class FormationRefuseView(_FormationTransitionView):
 
 
 class FormationPublishView(APIView):
-    """POST /api/formations/<id>/publish/ — BROUILLON ou VALIDEE -> PUBLIEE."""
+    """POST /api/formations/<id>/publish/ — BROUILLON, VALIDEE ou DEPUBLIEE
+    -> PUBLIEE (republier une formation déjà dépubliée ne nécessite pas de
+    repasser par une nouvelle validation : le contenu n'a pas changé)."""
 
     permission_classes = [IsInstructorOrAdmin]
 
@@ -214,14 +254,14 @@ class FormationPublishView(APIView):
                     {"detail": "Vous n'avez pas la permission de publier cette formation."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            if formation.statut != Formation.Statut.VALIDEE:
+            if formation.statut not in (Formation.Statut.VALIDEE, Formation.Statut.DEPUBLIEE):
                 return Response(
                     {"detail": "Votre formation doit d'abord être validée par un administrateur avant de pouvoir être publiée."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        elif formation.statut not in (Formation.Statut.BROUILLON, Formation.Statut.VALIDEE):
+        elif formation.statut not in (Formation.Statut.BROUILLON, Formation.Statut.VALIDEE, Formation.Statut.DEPUBLIEE):
             return Response(
-                {"detail": "Seule une formation en brouillon ou validée peut être publiée."},
+                {"detail": "Seule une formation en brouillon, validée ou dépubliée peut être publiée."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         formation.statut = Formation.Statut.PUBLIEE

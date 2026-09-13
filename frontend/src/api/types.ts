@@ -14,8 +14,10 @@ export interface User {
   last_name: string
   role: Role
   is_active: boolean
-  departement: string | null
-  departement_nom: string | null
+  // Un formateur peut appartenir à plusieurs départements (tableau vide
+  // pour les autres rôles) — jamais une seule FK.
+  departements: string[]
+  departements_noms: string[]
   bio: string
   avatar_url: string
   date_joined: string
@@ -80,6 +82,17 @@ export interface Category {
   id: string
   nom: string
   description: string
+  outils_associes?: OutilCode[]
+}
+
+export const OUTIL_LABELS: Record<OutilCode, string> = {
+  IDE: 'IDE (exécution de code)',
+  TABLEUR: 'Tableur',
+  NOTES: 'Notes',
+  CALCULATRICE: 'Calculatrice',
+  TABLEAU_BLANC: 'Tableau blanc',
+  MODELISATION_3D: 'Modélisation 3D',
+  CHIMIE_3D: 'Laboratoire de chimie 3D',
 }
 
 export interface Formation {
@@ -168,12 +181,24 @@ export interface Inscription {
 export interface ConversationIA {
   id: string
   lecon: string
+  // Autres leçons de la même formation incluses dans le contexte de cette
+  // question précise (multi-choix côté formulaire, cf. CoachIAPage).
+  lecons_associees: string[]
   question: string
   reponse: string
   created_at: string
 }
 
 // Abonnements (B2C individuel + B2B établissement)
+export type OutilCode =
+  | 'IDE'
+  | 'TABLEUR'
+  | 'NOTES'
+  | 'CALCULATRICE'
+  | 'TABLEAU_BLANC'
+  | 'MODELISATION_3D'
+  | 'CHIMIE_3D'
+
 export interface MonAbonnement {
   actif: boolean
   via: 'personnel' | 'etablissement' | null
@@ -182,6 +207,9 @@ export interface MonAbonnement {
   // Actionnable (rétrogradation) uniquement quand c'est un abonnement
   // personnel — jamais celui d'un établissement.
   abonnement_id: string | null
+  // Outils débloqués gratuitement via les catégories d'intérêt choisies à
+  // l'inscription — indépendant de `actif` (jamais tout l'abonnement).
+  outils_gratuits: OutilCode[]
 }
 
 export type TypePlan = 'INDIVIDUEL' | 'ETABLISSEMENT'

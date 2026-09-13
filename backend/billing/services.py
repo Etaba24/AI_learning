@@ -59,6 +59,17 @@ def a_acces_premium(user):
     return abonnement_actif_pour(user) is not None
 
 
+def a_acces_gratuit_outil(user, code_outil):
+    """Un outil précis (IDE, tableur...) est gratuit pour cet utilisateur
+    s'il a choisi, à l'inscription, au moins une catégorie qui débloque cet
+    outil (Category.outils_associes) — jamais un abonnement complet, juste
+    cet outil-là. N'accorde rien de plus que ce que l'admin a explicitement
+    associé à chaque catégorie."""
+    if not user.is_authenticated:
+        return False
+    return user.categories_interet.filter(outils_associes__code=code_outil).exists()
+
+
 def split_full_name(nom_complet):
     """Découpe "Jean Dupont" en (prénom, nom) — même règle que le frontend
     (premier espace) pour rester cohérent entre inscription manuelle et

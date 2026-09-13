@@ -116,6 +116,50 @@ export function FormationDetailPage() {
     }
   }, [formation, existingInscription])
 
+  // Règle de déverrouillage séquentiel — LA seule source de vérité, utilisée
+  // à la fois pour l'affichage (cadenas) et pour valider toute navigation,
+  // y compris celle déclenchée par les paramètres d'URL (?module=&lecon=).
+  // Sans cette seconde utilisation, un apprenant pouvait taper directement
+  // l'URL d'un module/leçon plus loin dans le programme et y accéder sans
+  // avoir terminé les précédents — le cadenas n'était qu'un habillage visuel
+  // jamais vérifié côté navigation.
+  function isModuleUnlocked(moduleIndex: number): boolean {
+    if (isPreviewOnly) return true
+    if (!formation || moduleIndex === 0) return true
+    const prevModule = formation.modules[moduleIndex - 1]
+    return prevModule.lecons.length > 0 && prevModule.lecons.every((l) => completedLessonIds.includes(l.id))
+  }
+
+  function isLessonUnlocked(module: PublicModule, lessonIndex: number): boolean {
+    if (isPreviewOnly || lessonIndex === 0) return true
+    return completedLessonIds.includes(module.lecons[lessonIndex - 1].id)
+  }
+
+  // Invalide toute sélection de module/leçon (qu'elle vienne d'un clic ou
+  // d'une URL tapée/collée directement) qui ne respecte pas le
+  // déverrouillage séquentiel ci-dessus.
+  useEffect(() => {
+    if (!formation || !canAccessContent) return
+
+    const modIdx = formation.modules.findIndex((m) => m.id === selectedModuleId)
+    if (selectedModuleId && (modIdx === -1 || !isModuleUnlocked(modIdx))) {
+      setSelectedModuleId(null)
+      setActiveLeconId(null)
+      setSearchParams({})
+      return
+    }
+
+    if (activeLeconId && modIdx !== -1) {
+      const mod = formation.modules[modIdx]
+      const lecIdx = mod.lecons.findIndex((l) => l.id === activeLeconId)
+      if (lecIdx === -1 || !isLessonUnlocked(mod, lecIdx)) {
+        setActiveLeconId(null)
+        setSearchParams({ module: mod.id })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formation, canAccessContent, completedLessonIds, selectedModuleId, activeLeconId])
+
   async function handleEnroll() {
     setEnrollError(null)
     setIsEnrolling(true)
@@ -430,8 +474,7 @@ export function FormationDetailPage() {
                   {currentModule.lecons.map((lecon, lIdx) => {
                     const isDone = completedLessonIds.includes(lecon.id)
                     const isSelected = lecon.id === activeLeconId
-                    const isPreviousDone = lIdx === 0 || completedLessonIds.includes(currentModule.lecons[lIdx - 1].id)
-                    const isUnlocked = isPreviewOnly || isDone || isSelected || isPreviousDone
+                    const isUnlocked = isDone || isSelected || isLessonUnlocked(currentModule, lIdx)
 
                     return (
                       <div key={lecon.id} className="relative group">
@@ -559,8 +602,7 @@ export function FormationDetailPage() {
                 {formation.modules.map((module, mIdx) => {
                   const completedCountInMod = module.lecons.filter((l) => completedLessonIds.includes(l.id)).length
                   const isModCompleted = module.lecons.length > 0 && completedCountInMod === module.lecons.length
-                  const isPreviousModCompleted = mIdx === 0 || (formation.modules[mIdx - 1].lecons.length > 0 && formation.modules[mIdx - 1].lecons.every((l) => completedLessonIds.includes(l.id)))
-                  const isModUnlocked = isPreviewOnly || !existingInscription || mIdx === 0 || isModCompleted || isPreviousModCompleted
+                  const isModUnlocked = !existingInscription || isModuleUnlocked(mIdx)
 
                   return (
                     <div key={module.id} className="relative group">

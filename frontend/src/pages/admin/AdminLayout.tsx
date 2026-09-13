@@ -119,7 +119,30 @@ export function AdminLayout() {
 
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const unreadNotifications = notifications.filter((item) => !item.read).length
+
+  // Recherche globale du header : redirige vers la liste la plus pertinente
+  // (Formations) avec la recherche déjà appliquée — pas de mini-moteur de
+  // recherche à part, la page cible sait déjà filtrer sur `q`.
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (!q) return
+    navigate(`/admin/formations?q=${encodeURIComponent(q)}`)
+  }
+
+  // Raccourci ⌘K / Ctrl+K : focus direct sur la barre de recherche.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   function handleOpenNotifications() {
     const next = !showNotifications
@@ -314,10 +337,11 @@ export function AdminLayout() {
           </div>
 
           {/* CENTRE : RECHERCHE GLOBALE AVEC RACCOURCI (CTRL+K) */}
-          <div className="relative hidden max-w-xs flex-1 px-4 lg:block">
+          <form onSubmit={handleSearchSubmit} className="relative hidden max-w-xs flex-1 px-4 lg:block">
             <div className="relative flex items-center">
               <Search size={16} className="absolute left-3 text-slate-400" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -326,6 +350,7 @@ export function AdminLayout() {
               />
               {searchQuery ? (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
@@ -337,7 +362,7 @@ export function AdminLayout() {
                 </kbd>
               )}
             </div>
-          </div>
+          </form>
 
           {/* DROITE : BASCIULE DE THÈME + NOTIFICATIONS + MENU PROFIL */}
           <div className="flex items-center gap-2 shrink-0">

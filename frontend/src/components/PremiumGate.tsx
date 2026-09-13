@@ -2,14 +2,16 @@ import { Loader2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api/client'
-import type { MonAbonnement } from '../api/types'
+import type { MonAbonnement, OutilCode } from '../api/types'
 import { PremiumOffersModal } from './PremiumOffersModal'
 
-/** Verrou d'interface pour les pages réservées aux abonnés. Le vrai
- * contrôle est côté backend (HasActiveSubscription) — ici on évite
- * d'afficher un outil qui répondrait 403, et on présente les formules
- * dans un popup sur place (pas de redirection vers une autre page). */
-export function PremiumGate({ children }: { children: ReactNode }) {
+/** Verrou d'interface pour les pages réservées aux abonnés — ou, si `tool`
+ * est fourni, aussi débloquées gratuitement via les catégories d'intérêt
+ * choisies à l'inscription (voir MonAbonnement.outils_gratuits). Le vrai
+ * contrôle est côté backend (HasActiveSubscription/HasToolAccess) — ici on
+ * évite d'afficher un outil qui répondrait 403, et on présente les
+ * formules dans un popup sur place (pas de redirection vers une autre page). */
+export function PremiumGate({ children, tool }: { children: ReactNode; tool?: OutilCode }) {
   const navigate = useNavigate()
   const [abonnement, setAbonnement] = useState<MonAbonnement | null>(null)
   const [error, setError] = useState(false)
@@ -33,7 +35,9 @@ export function PremiumGate({ children }: { children: ReactNode }) {
     )
   }
 
-  if (abonnement.actif) {
+  const hasFreeToolAccess = Boolean(tool && abonnement.outils_gratuits.includes(tool))
+
+  if (abonnement.actif || hasFreeToolAccess) {
     return <>{children}</>
   }
 
