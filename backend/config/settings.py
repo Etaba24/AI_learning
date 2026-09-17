@@ -38,6 +38,38 @@ if not ADMIN_URL_PATH.endswith('/'):
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 
+# Render fournit automatiquement le nom d'hôte public du service dans cette
+# variable (jamais à définir soi-même) — on l'ajoute pour ne pas avoir à
+# dupliquer la même valeur dans ALLOWED_HOSTS en plus de la config Render.
+RENDER_EXTERNAL_HOSTNAME = env.str('RENDER_EXTERNAL_HOSTNAME', default='')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Nécessaire pour que l'admin Django (basé sur les sessions, pas JWT) accepte
+# les requêtes POST venant du vrai domaine en prod — sans ça, le formulaire
+# de connexion admin échoue avec une erreur CSRF dès qu'on n'est plus sur
+# localhost.
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+
+# Render (comme la plupart des PaaS) termine le HTTPS à son load-balancer et
+# transmet ensuite en HTTP simple à l'application, avec cet en-tête pour dire
+# "c'était du HTTPS côté client" — sans le déclarer ici, Django croit que
+# CHAQUE requête est en clair et SECURE_SSL_REDIRECT (ci-dessous) créerait une
+# boucle de redirection infinie.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if not DEBUG:
+    # Ces réglages n'ont de sens qu'avec un vrai domaine HTTPS devant
+    # l'application (jamais en dev, où il n'y a pas de certificat) : ils
+    # forcent HTTPS, empêchent les cookies de session/CSRF de partir en
+    # clair, et durcissent le navigateur contre le clickjacking/sniffing.
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 jours pour commencer
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 
 # Application definition
 
@@ -77,6 +109,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Sert les fichiers statiques (admin Django, DRF browsable API) sans
+    # serveur web séparé (nginx...) — indispensable sur Render où l'app tourne
+    # seule derrière leur load-balancer. Doit rester juste après
+    # SecurityMiddleware (exigence de whitenoise).
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -173,13 +210,46 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Fichiers déposés par les utilisateurs (PDF/EPUB de la bibliothèque) — stockage
-# disque local en dev ; à remplacer par un stockage objet (S3/MinIO) en
-# production (voir section 12 du cahier des charges, déjà anticipé pour les
-# avatars via avatar_url).
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+STORAGES = {
+    'staticfiles': {
+        # Compresse et versionne (hash dans le nom de fichier) les statiques
+        # au moment du `collectstatic` — whitenoise sert ensuite ces fichiers
+        # directement, avec des en-têtes de cache long terme sans risque
+        # (un nom de fichier différent à chaque changement de contenu).
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+# Fichiers déposés par les utilisateurs (vidéos, PDF/EPUB, avatars). En dev :
+# disque local (simple, pas de compte cloud nécessaire). En prod (USE_S3=True) :
+# stockage objet S3-compatible (Cloudflare R2, ou AWS S3) — sur un PaaS comme
+# Render, le disque de l'app est éphémère et est effacé à chaque redéploiement,
+# ce qui supprimerait tous les fichiers déposés par les formateurs/apprenants.
+USE_S3 = env.bool('USE_S3', default=False)
+
+if USE_S3:
+    AWS_ACCESS_KEY_ID = env.str('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = env.str('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = env.str('AWS_STORAGE_BUCKET_NAME')
+    # Endpoint du fournisseur S3-compatible — pour Cloudflare R2 :
+    # https://<account_id>.r2.cloudflarestorage.com
+    AWS_S3_ENDPOINT_URL = env.str('AWS_S3_ENDPOINT_URL')
+    # Domaine public servant réellement les fichiers (bucket R2 rendu public,
+    # ou domaine personnalisé branché sur le bucket) — distinct de
+    # AWS_S3_ENDPOINT_URL, qui lui est l'API de gestion, pas de lecture publique.
+    AWS_S3_CUSTOM_DOMAIN = env.str('AWS_S3_CUSTOM_DOMAIN')
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH = False  # bucket public : pas besoin d'URLs signées
+
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3.S3Storage'}
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+else:
+    STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
+    MEDIA_URL = 'media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 # Limites globales pour les uploads (bytes). Empêche les requêtes contenant
 # des fichiers plus lourds que la valeur configurée d'être entièrement

@@ -1,0 +1,78 @@
+# Blueprint Render : décrit le service backend + sa base de données.
+# À importer une seule fois depuis le dashboard Render ("New +" -> "Blueprint"),
+# après avoir poussé ce fichier sur GitHub. Render lit ce fichier et crée
+# automatiquement les ressources ci-dessous.
+#
+# Documentation : https://render.com/docs/blueprint-spec
+
+databases:
+  - name: ai-learning-db
+    plan: starter
+    databaseName: ai_learning
+    user: ai_learning
+
+services:
+  - type: web
+    name: ai-learning-backend
+    runtime: python
+    plan: starter
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    # migrate avant de démarrer le serveur : applique les migrations à
+    # chaque déploiement, sans étape manuelle à refaire soi-même.
+    startCommand: "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+    healthCheckPath: /api/departements/
+    envVars:
+      # Injectée automatiquement par Render depuis la base déclarée ci-dessus —
+      # jamais à renseigner à la main.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-learning-db
+          property: connectionString
+      # Injectée automatiquement par Render (nom d'hôte public du service).
+      - key: RENDER_EXTERNAL_HOSTNAME
+        fromService:
+          type: web
+          name: ai-learning-backend
+          property: host
+      - key: DEBUG
+        value: "False"
+      # Toutes les valeurs "sync: false" ci-dessous doivent être saisies à la
+      # main dans l'onglet "Environment" du service, une fois créé sur Render
+      # (Render ne doit jamais recevoir de vrai secret via ce fichier commité).
+      - key: SECRET_KEY
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_URL_PATH
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: JDOODLE_CLIENT_ID
+        sync: false
+      - key: JDOODLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: USE_S3
+        value: "True"
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_S3_CUSTOM_DOMAIN
+        sync: false
