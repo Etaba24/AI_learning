@@ -124,11 +124,10 @@ export function InstructorLayout() {
   }, [])
 
   function handleOpenNotifications() {
-    const next = !showNotifications
-    setShowNotifications(next)
-    if (next) {
-      setNotifications((current) => current.map((item) => ({ ...item, read: true })))
-    }
+    // Ne marque plus tout comme lu à l'ouverture : sinon l'indicateur
+    // "non lue" disparaissait avant même d'avoir pu la voir/cliquer —
+    // seul un clic sur une notification précise la marque comme lue.
+    setShowNotifications((current) => !current)
   }
 
   function handleNotificationClick(path: string) {

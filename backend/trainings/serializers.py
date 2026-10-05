@@ -28,7 +28,7 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["id", "nom", "description", "outils_associes"]
 
 
-from assessments.serializers import ExerciceSerializer, QuizSerializer
+from assessments.serializers import ExerciceSerializer, QuizPublicSerializer, QuizSerializer
 
 
 class RessourceSerializer(serializers.ModelSerializer):
@@ -248,7 +248,11 @@ class LeconContenuSerializer(serializers.ModelSerializer):
     def get_quiz(self, obj):
         if self.get_verrouille(obj):
             return []
-        return QuizSerializer(obj.quiz.all(), many=True).data
+        # QuizPublicSerializer (jamais QuizSerializer, réservé à
+        # l'admin/formateur) : ne renvoie jamais quelle option est correcte
+        # — sinon un apprenant la lirait dans le JSON avant même d'y
+        # répondre, et le QCM ne validerait plus rien de réel.
+        return QuizPublicSerializer(obj.quiz.all(), many=True).data
 
 
 class ModuleContenuSerializer(serializers.ModelSerializer):

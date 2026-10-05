@@ -82,7 +82,7 @@ export function MyCoursesPage() {
     : 0
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* STATISTIQUES APPRENANT */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">

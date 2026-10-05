@@ -2,6 +2,7 @@ import { ArrowLeft, Boxes, Loader2, Plus, Save, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
 import { DEFAULT_PAGE_SIZE } from '../../api/types'
+import { BackToToolsLink } from '../../components/BackToToolsLink'
 import { useConfirm } from '../../components/ConfirmContext'
 import { Pagination } from '../../components/Pagination'
 import { useToast } from '../../components/ToastContext'
@@ -217,6 +218,8 @@ export function Modelisation3DPage() {
   // ---- Vue liste ----
   return (
     <div className="space-y-6">
+      <BackToToolsLink />
+
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
           <Boxes size={18} className="text-sky-500" />

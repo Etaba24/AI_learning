@@ -37,3 +37,35 @@ class ExerciceSerializer(serializers.ModelSerializer):
         model = Exercice
         fields = ["id", "lecon", "enonce", "correction"]
         read_only_fields = ["lecon"]
+
+
+# ============================================================
+# Version "publique" du quiz — jamais `est_correcte` : servie à l'apprenant
+# AVANT qu'il réponde (via FormationContenuView), la bonne réponse ne doit
+# jamais transiter dans ce JSON, sous peine d'être lisible dans l'onglet
+# Réseau du navigateur et de vider le QCM de tout intérêt. La correction
+# n'est révélée qu'après coup, par QuizSubmitView, une fois la réponse de
+# l'apprenant déjà enregistrée.
+# ============================================================
+
+
+class ChoicePublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Choice
+        fields = ["id", "texte"]
+
+
+class QuestionPublicSerializer(serializers.ModelSerializer):
+    choix = ChoicePublicSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Question
+        fields = ["id", "enonce", "ordre", "choix"]
+
+
+class QuizPublicSerializer(serializers.ModelSerializer):
+    questions = QuestionPublicSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Quiz
+        fields = ["id", "titre", "seuil_reussite", "questions"]

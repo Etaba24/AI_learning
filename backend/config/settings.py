@@ -105,6 +105,9 @@ INSTALLED_APPS = [
     'messaging',
     'library',
     'chemistry',
+    'cartography',
+    'embedded',
+    'news',
 ]
 
 MIDDLEWARE = [

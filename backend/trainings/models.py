@@ -18,6 +18,8 @@ class Outil(models.Model):
         TABLEAU_BLANC = "TABLEAU_BLANC", "Tableau blanc"
         MODELISATION_3D = "MODELISATION_3D", "Modélisation 3D"
         CHIMIE_3D = "CHIMIE_3D", "Laboratoire de chimie 3D"
+        CARTOGRAPHIE = "CARTOGRAPHIE", "Cartographie"
+        ARDUINO = "ARDUINO", "Systèmes embarqués (Arduino)"
 
     code = models.CharField(max_length=30, choices=Code.choices, unique=True)
 

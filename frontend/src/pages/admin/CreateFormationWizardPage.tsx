@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Check,
   Eye,
+  Pencil,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -125,6 +126,10 @@ export function CreateFormationWizardPage() {
 
   // Modale d'ajout de leçon (Step 3) - support vidéo & document via Fichier ou URL
   const [isAddLessonOpen, setIsAddLessonOpen] = useState(false)
+  // null = création d'une nouvelle leçon ; sinon id de la leçon en cours
+  // de modification (le formulaire est le même, seul le comportement à la
+  // soumission change — mise à jour en place plutôt qu'ajout).
+  const [editingLeconId, setEditingLeconId] = useState<string | null>(null)
   const [newLessonTitle, setNewLessonTitle] = useState('')
   const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('')
   const [newLessonVideoDuree, setNewLessonVideoDuree] = useState(12)
@@ -426,6 +431,56 @@ export function CreateFormationWizardPage() {
   }
 
   // GESTION DES LEÇONS
+  function resetLessonForm() {
+    setNewLessonTitle('')
+    setNewLessonVideoUrl('')
+    setNewLessonVideoDuree(12)
+    setNewLessonContent('')
+    setNewLessonDocName('')
+    setNewLessonDocUrl('')
+    setVideoFile(null)
+    setDocFile(null)
+    setVideoSourceMode('FILE')
+    setDocSourceMode('FILE')
+  }
+
+  function handleOpenAddLesson() {
+    setEditingLeconId(null)
+    resetLessonForm()
+    setIsAddLessonOpen(true)
+  }
+
+  // Pré-remplit le même formulaire avec les valeurs existantes de la leçon
+  // — en mode URL (jamais FILE) pour la vidéo/le support déjà en ligne :
+  // on n'a pas le fichier original sous la main, seule son URL déjà
+  // hébergée, donc pas d'autre choix que de la proposer telle quelle.
+  function handleOpenEditLesson(lec: LeconWizard) {
+    setEditingLeconId(lec.id)
+    setNewLessonTitle(lec.titre)
+    setNewLessonVideoUrl(lec.videoUrl)
+    setNewLessonVideoDuree(lec.videoDureeMin)
+    setNewLessonContent(lec.contenuTextuel)
+    setVideoFile(null)
+    setVideoSourceMode('URL')
+    setDocFile(null)
+    if (lec.support) {
+      setDocSourceMode('URL')
+      setNewLessonDocName(lec.support.nom)
+      setNewLessonDocUrl(lec.support.url)
+    } else {
+      setDocSourceMode('FILE')
+      setNewLessonDocName('')
+      setNewLessonDocUrl('')
+    }
+    setIsAddLessonOpen(true)
+  }
+
+  function closeLessonModal() {
+    setIsAddLessonOpen(false)
+    setEditingLeconId(null)
+    resetLessonForm()
+  }
+
   async function handleAddLesson(e: React.FormEvent) {
     e.preventDefault()
     if (!newLessonTitle.trim()) return
@@ -458,29 +513,40 @@ export function CreateFormationWizardPage() {
         }
       }
 
-      const newLec: LeconWizard = {
-        id: `lec-${Date.now()}`,
-        titre: newLessonTitle,
-        videoUrl: finalVideoUrl,
-        videoDureeMin: Number(newLessonVideoDuree) || 10,
-        contenuTextuel: newLessonContent,
-        support: finalSupport,
-        exercices: [],
+      const updatedModules = [...modules]
+      const targetModule = updatedModules[selectedModuleIdIndex]
+
+      if (editingLeconId) {
+        const lecIndex = targetModule.lecons.findIndex((l) => l.id === editingLeconId)
+        if (lecIndex !== -1) {
+          const existing = targetModule.lecons[lecIndex]
+          targetModule.lecons = [...targetModule.lecons]
+          targetModule.lecons[lecIndex] = {
+            ...existing,
+            titre: newLessonTitle,
+            videoUrl: finalVideoUrl || existing.videoUrl,
+            videoDureeMin: Number(newLessonVideoDuree) || 10,
+            contenuTextuel: newLessonContent,
+            support: finalSupport ?? existing.support,
+          }
+        }
+        showToast('success', `La leçon "${newLessonTitle}" a été mise à jour.`, 'Leçon modifiée')
+      } else {
+        const newLec: LeconWizard = {
+          id: `lec-${Date.now()}`,
+          titre: newLessonTitle,
+          videoUrl: finalVideoUrl,
+          videoDureeMin: Number(newLessonVideoDuree) || 10,
+          contenuTextuel: newLessonContent,
+          support: finalSupport,
+          exercices: [],
+        }
+        targetModule.lecons = [...targetModule.lecons, newLec]
+        showToast('success', `La leçon "${newLec.titre}" a été ajoutée au module.`, 'Leçon créée')
       }
 
-      const updatedModules = [...modules]
-      updatedModules[selectedModuleIdIndex].lecons.push(newLec)
       setModules(updatedModules)
-
-      setIsAddLessonOpen(false)
-      setNewLessonTitle('')
-      setNewLessonVideoUrl('')
-      setNewLessonContent('')
-      setNewLessonDocName('')
-      setNewLessonDocUrl('')
-      setVideoFile(null)
-      setDocFile(null)
-      showToast('success', `La leçon "${newLec.titre}" a été ajoutée au module.`, 'Leçon créée')
+      closeLessonModal()
     } catch (err) {
       showToast(
         'error',
@@ -620,12 +686,25 @@ export function CreateFormationWizardPage() {
             })
           }
 
-          for (const qItem of lecItem.exercices) {
-            await apiFetch(`/lecons/${createdLecon.id}/exercices/`, {
+          // Un vrai QCM (Quiz/Question/Choice), pas un Exercice à texte
+          // libre auto-évalué — sinon la bonne réponse ne sert à rien
+          // côté serveur et l'apprenant se contente de cliquer "vérifier"
+          // sans jamais avoir réellement répondu.
+          if (lecItem.exercices.length > 0) {
+            await apiFetch(`/lecons/${createdLecon.id}/quiz/`, {
               method: 'POST',
               body: {
-                enonce: qItem.question,
-                correction: `Option correcte: ${qItem.correctOption}. ${qItem.explication}`,
+                titre: `QCM — ${lecItem.titre}`,
+                seuil_reussite: 70,
+                questions: lecItem.exercices.map((qItem) => ({
+                  enonce: qItem.question,
+                  choix: [
+                    { texte: qItem.optionA, est_correcte: qItem.correctOption === 'A' },
+                    { texte: qItem.optionB, est_correcte: qItem.correctOption === 'B' },
+                    { texte: qItem.optionC, est_correcte: qItem.correctOption === 'C' },
+                    { texte: qItem.optionD, est_correcte: qItem.correctOption === 'D' },
+                  ],
+                })),
               },
             })
           }
@@ -1106,7 +1185,7 @@ export function CreateFormationWizardPage() {
                     </div>
 
                     <button
-                      onClick={() => setIsAddLessonOpen(true)}
+                      onClick={handleOpenAddLesson}
                       className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-sky-700 active:scale-95 shrink-0"
                     >
                       <Plus size={16} />
@@ -1141,6 +1220,13 @@ export function CreateFormationWizardPage() {
                               >
                                 <Eye size={13} />
                                 <span>Consulter la leçon</span>
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditLesson(lec)}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-100 px-3 py-1 text-[10px] font-extrabold text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 transition-all"
+                              >
+                                <Pencil size={13} />
+                                <span>Éditer</span>
                               </button>
                             </div>
 
@@ -1382,9 +1468,9 @@ export function CreateFormationWizardPage() {
           <div className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                Créer une nouvelle leçon avec tous ses supports
+                {editingLeconId ? 'Modifier la leçon et ses supports' : 'Créer une nouvelle leçon avec tous ses supports'}
               </h3>
-              <button onClick={() => setIsAddLessonOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={closeLessonModal} className="text-slate-400 hover:text-slate-600">
                 ✕
               </button>
             </div>
@@ -1550,7 +1636,7 @@ export function CreateFormationWizardPage() {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddLessonOpen(false)}
+                  onClick={closeLessonModal}
                   disabled={isUploadingLessonMedia}
                   className="rounded-2xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                 >
@@ -1561,7 +1647,11 @@ export function CreateFormationWizardPage() {
                   disabled={isUploadingLessonMedia}
                   className="rounded-2xl bg-sky-600 px-5 py-2 text-xs font-extrabold text-white hover:bg-sky-700 shadow-md disabled:opacity-50"
                 >
-                  {isUploadingLessonMedia ? 'Envoi des fichiers...' : 'Enregistrer la leçon'}
+                  {isUploadingLessonMedia
+                    ? 'Envoi des fichiers...'
+                    : editingLeconId
+                    ? 'Enregistrer les modifications'
+                    : 'Enregistrer la leçon'}
                 </button>
               </div>
             </form>

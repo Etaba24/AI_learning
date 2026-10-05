@@ -18,6 +18,7 @@ import {
   Search,
   Sparkles,
   Sun,
+  TrendingUp,
   User,
   Wrench,
   X,
@@ -29,6 +30,7 @@ import { apiFetch } from '../../api/client'
 import { ROLE_LABELS, type Inscription, type PaginatedResponse } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { useConfirm } from '../../components/ConfirmContext'
+import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
 import { useTheme } from '../../theme/ThemeContext'
 
 export function StudentLayout() {
@@ -45,6 +47,7 @@ export function StudentLayout() {
         { to: '/apprenant', label: t('student.nav.dashboard'), icon: LayoutDashboard, end: true },
         { to: '/apprenant/catalogue', label: t('student.nav.catalogue'), icon: Compass, end: false },
         { to: '/apprenant/mes-formations', label: t('student.nav.mesFormations'), icon: GraduationCap, end: false },
+        { to: '/apprenant/progression', label: t('student.nav.progression'), icon: TrendingUp, end: false },
         { to: '/apprenant/coach-ia', label: t('student.nav.coachIa'), icon: MessageCircle, end: false },
         { to: '/apprenant/messagerie', label: t('student.nav.messagerie'), icon: MessageSquare, end: false },
       ],
@@ -64,6 +67,7 @@ export function StudentLayout() {
     '/apprenant': (t('student.pageTitles.dashboard', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/catalogue': (t('student.pageTitles.catalogue', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/mes-formations': (t('student.pageTitles.mesFormations', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
+    '/apprenant/progression': (t('student.pageTitles.progression', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/coach-ia': (t('student.pageTitles.coachIa', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/messagerie': (t('student.pageTitles.messagerie', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/actualites': (t('student.pageTitles.actualites', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
@@ -75,6 +79,8 @@ export function StudentLayout() {
     '/apprenant/outils/calculatrice': (t('student.pageTitles.outilsCalculatrice', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/outils/tableau-blanc': (t('student.pageTitles.outilsTableauBlanc', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/outils/modelisation-3d': (t('student.pageTitles.outilsModelisation3d', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
+    '/apprenant/outils/cartographie': (t('student.pageTitles.outilsCartographie', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
+    '/apprenant/outils/arduino': (t('student.pageTitles.outilsArduino', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/abonnement': (t('student.pageTitles.abonnement', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
     '/apprenant/parametres': (t('student.pageTitles.parametres', { returnObjects: true }) as { category: string; title: string; subtitle: string }),
   }
@@ -133,11 +139,10 @@ export function StudentLayout() {
   }, [])
 
   function handleOpenNotifications() {
-    const next = !showNotifications
-    setShowNotifications(next)
-    if (next) {
-      setNotifications((current) => current.map((item) => ({ ...item, read: true })))
-    }
+    // Ne marque plus tout comme lu à l'ouverture : sinon l'indicateur
+    // "non lue" disparaissait avant même d'avoir pu la voir/cliquer —
+    // seul un clic sur une notification précise la marque comme lue.
+    setShowNotifications((current) => !current)
   }
 
   function handleNotificationClick(path: string) {
@@ -154,11 +159,19 @@ export function StudentLayout() {
   // rafraîchirait jamais après une rétrogradation faite ailleurs.
   const [formationEnCours, setFormationEnCours] = useState<Inscription | null>(null)
 
-  useEffect(() => {
+  function loadFormationEnCours() {
     apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
       .then((data) => setFormationEnCours(data.results.find((i) => i.statut === 'EN_COURS') ?? null))
       .catch(() => {})
-  }, [])
+  }
+
+  useEffect(loadFormationEnCours, [])
+  // Sans cet abonnement, ce bloc restait figé sur l'ancienne inscription
+  // après une désinscription/réinscription ailleurs dans l'espace apprenant
+  // (ce layout reste monté d'une page à l'autre, jamais remonté) : il
+  // fallait recharger la page entière pour que la progression affichée ici
+  // se resynchronise avec la réalité.
+  useRealtimeTopics(['mes_formations'], loadFormationEnCours)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

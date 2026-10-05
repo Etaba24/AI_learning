@@ -2,6 +2,7 @@ import Editor from '@monaco-editor/react'
 import { ChevronDown, Loader2, Play, TerminalSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
+import { BackToToolsLink } from '../../components/BackToToolsLink'
 import { useTheme } from '../../theme/ThemeContext'
 
 interface LanguageOption {
@@ -108,6 +109,8 @@ export function IdePage() {
 
   return (
     <div className="flex h-full flex-col gap-4">
+      <BackToToolsLink />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <select
           value={language}

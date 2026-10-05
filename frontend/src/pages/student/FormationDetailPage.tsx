@@ -24,6 +24,7 @@ import {
 } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert } from '../../components/Alert'
+import { CourseCompletionModal } from '../../components/CourseCompletionModal'
 import { InteractiveLessonViewer } from '../../components/InteractiveLessonViewer'
 
 export function FormationDetailPage() {
@@ -42,6 +43,7 @@ export function FormationDetailPage() {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(targetModuleId)
   const [activeLeconId, setActiveLeconId] = useState<string | null>(targetLeconId)
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([])
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [enrollError, setEnrollError] = useState<string | null>(null)
   const [isEnrolling, setIsEnrolling] = useState(false)
@@ -214,11 +216,41 @@ export function FormationDetailPage() {
     window.scrollTo({ top: 350, behavior: 'smooth' })
   }
 
+  // Rafraîchit progress_percent depuis le serveur (source de vérité réelle
+  // des leçons terminées, calculée à partir des Progression enregistrées)
+  // plutôt que de ne compter que sur l'incrément local optimiste — sinon
+  // le verrouillage séquentiel resterait basé sur une approximation qui
+  // ne reflète jamais ce qu'a réellement validé le serveur.
+  async function refreshProgress() {
+    try {
+      const data = await apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
+      setInscriptions(data.results)
+    } catch {
+      // Pas bloquant : l'incrément local optimiste ci-dessous reste affiché.
+    }
+  }
+
   function handleCompleteAndNextLesson() {
-    if (!currentLecon || !formation) return
+    if (!currentLecon || !formation || !existingInscription) return
 
     if (!completedLessonIds.includes(currentLecon.id)) {
       setCompletedLessonIds((prev) => [...prev, currentLecon.id])
+    }
+
+    // Une leçon avec QCM est déjà persistée côté serveur par
+    // InteractiveLessonViewer (via onQuizPassed) au moment de la réussite —
+    // pas la peine de reposter ici. Les autres (texte/vidéo sans QCM)
+    // n'ont encore jamais été signalées au serveur : on le fait maintenant,
+    // sinon progress_percent ne bougera jamais et le verrouillage des
+    // modules suivants resterait bloqué pour de vrai côté serveur.
+    const hasQuiz = Boolean(currentLecon.quiz && currentLecon.quiz.length > 0)
+    if (!hasQuiz) {
+      apiFetch(`/inscriptions/${existingInscription.id}/lecons/${currentLecon.id}/progress/`, {
+        method: 'POST',
+        body: { lu: true },
+      })
+        .then(refreshProgress)
+        .catch(() => {})
     }
 
     const flatLessons: { id: string; moduleId: string }[] = []
@@ -232,6 +264,10 @@ export function FormationDetailPage() {
       setSelectedModuleId(nextLecon.moduleId)
       setActiveLeconId(nextLecon.id)
       setSearchParams({ module: nextLecon.moduleId, lecon: nextLecon.id })
+    } else {
+      // Dernière leçon du dernier module : il n'y a nulle part où
+      // "continuer" — sans ça, le clic ne produisait aucun retour visible.
+      setShowCompletionModal(true)
     }
   }
 
@@ -424,6 +460,7 @@ export function FormationDetailPage() {
               <Alert variant="error" message={contentError} />
             ) : isContentLoaded ? (
               <InteractiveLessonViewer
+                key={currentLecon.id}
                 formationTitle={formation.titre}
                 moduleTitle={currentModule?.titre || ''}
                 moduleIndex={currentModuleIndex + 1}
@@ -432,6 +469,12 @@ export function FormationDetailPage() {
                 totalLeconsInModule={currentModule?.lecons.length || 0}
                 isCompleted={completedLessonIds.includes(currentLecon.id)}
                 onCompleteAndNext={handleCompleteAndNextLesson}
+                onQuizPassed={() => {
+                  if (!completedLessonIds.includes(currentLecon.id)) {
+                    setCompletedLessonIds((prev) => [...prev, currentLecon.id])
+                  }
+                  refreshProgress()
+                }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-slate-400">
@@ -699,6 +742,10 @@ export function FormationDetailPage() {
           </div>
         )}
       </div>
+
+      {showCompletionModal && (
+        <CourseCompletionModal formationTitle={formation.titre} onClose={() => setShowCompletionModal(false)} />
+      )}
     </div>
   )
 }

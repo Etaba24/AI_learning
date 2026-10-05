@@ -3,6 +3,7 @@ import { Suspense, lazy, useState, type FormEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
 import { COULEUR_CATEGORIE, ELEMENTS, type ElementChimique } from '../../data/periodicTable'
 import { REACTIFS_DISPONIBLES, trouverReaction, type ReactionChimie } from '../../data/reactionsChimie'
+import { BackToToolsLink } from '../../components/BackToToolsLink'
 import type { AtomeMolecule, LiaisonMolecule } from '../../components/MoleculeViewer3D'
 
 // three.js pèse lourd : chargé uniquement une fois une molécule affichée
@@ -260,6 +261,8 @@ export function ChimiePage() {
 
   return (
     <div className="space-y-6">
+      <BackToToolsLink />
+
       <div className="relative overflow-hidden rounded-3xl border border-emerald-200/50 bg-gradient-to-br from-slate-900 via-emerald-950 to-teal-950 p-6 text-white shadow-xl sm:p-8 dark:border-emerald-500/20">
         <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
         <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Laboratoire de chimie 3D</h1>

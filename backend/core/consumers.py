@@ -26,6 +26,8 @@ TOPIC_ROLES = {
     "bibliotheque": None,
     "catalogue": None,
     "mes_formations": None,
+    "annonces": None,
+    "admin_annonces": {User.Role.ADMIN},
     "etablissement_membres": {User.Role.ETABLISSEMENT_ADMIN},
     "etablissement_classes": {User.Role.ETABLISSEMENT_ADMIN},
 }

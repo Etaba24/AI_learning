@@ -1,42 +1,37 @@
 import {
-  ArrowRight,
+  Award,
   BookOpen,
   CheckCircle2,
-  Clock,
-  Award,
-  PlayCircle,
-  Sparkles,
-  TrendingUp,
+  ChevronRight,
   Compass,
-  MapPin,
-  ChevronDown,
-  ChevronUp,
-  Circle,
+  GraduationCap,
+  Library,
+  MessageCircle,
+  Play,
+  TrendingUp,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
-import { NIVEAU_LABELS, type Inscription, type PaginatedResponse, type PublicFormation, type PublicFormationDetail } from '../../api/types'
+import { type Inscription, type PaginatedResponse, type PublicFormationDetail } from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
-import { RecommendedPathStepper } from '../../components/RecommendedPathStepper'
 
+// Point d'entrée volontairement minimal de l'espace apprenant : un coup
+// d'œil sur les chiffres clés, le cours à reprendre, des raccourcis vers le
+// reste de l'espace, et l'activité récente — le détail complet (parcours,
+// modules/leçons) vit dans la rubrique « Progression » (ProgressionPage).
 export function StudentDashboardPage() {
   const { user } = useAuth()
-  const navigate = useNavigate()
-
   const [inscriptions, setInscriptions] = useState<Inscription[] | null>(null)
-  const [catalogue, setCatalogue] = useState<PublicFormation[] | null>(null)
   const [activeCourseDetail, setActiveCourseDetail] = useState<PublicFormationDetail | null>(null)
-  const [showLessonBreakdown, setShowLessonBreakdown] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   function loadInscriptions() {
     apiFetch<PaginatedResponse<Inscription>>('/inscriptions/')
       .then((data) => {
         setInscriptions(data.results)
-        // S'il y a au moins une formation en cours, charger son détail
         const enCours = data.results.find((i) => i.statut === 'EN_COURS')
         if (enCours) {
           apiFetch<PublicFormationDetail>(`/catalogue/formations/${enCours.formation}/`)
@@ -47,25 +42,14 @@ export function StudentDashboardPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des cours.'))
   }
 
-  function loadCatalogue() {
-    apiFetch<PaginatedResponse<PublicFormation>>('/catalogue/formations/')
-      .then((data) => setCatalogue(data.results.slice(0, 3)))
-      .catch(() => setCatalogue([]))
-  }
-
-  useEffect(() => {
-    loadInscriptions()
-    loadCatalogue()
-  }, [])
-
+  useEffect(loadInscriptions, [])
   useRealtimeTopics(['mes_formations'], loadInscriptions)
-  useRealtimeTopics(['catalogue'], loadCatalogue)
 
   if (error) {
     return <Alert variant="error" message={error} />
   }
 
-  if (!inscriptions || !catalogue) {
+  if (!inscriptions) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <div className="h-9 w-9 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
@@ -74,397 +58,180 @@ export function StudentDashboardPage() {
     )
   }
 
-  // Calculs statistiques
-  const studentName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email : 'Apprenant'
+  const studentName = user?.first_name || (user?.email ? user.email.split('@')[0] : 'Apprenant')
   const enCoursList = inscriptions.filter((i) => i.statut === 'EN_COURS')
-  const termineesList = inscriptions.filter((i) => i.statut === 'TERMINEE')
-
-  // Dernière formation en cours pour le bloc "Reprendre"
-  const currentCourse = enCoursList.length > 0 ? enCoursList[0] : null
-
+  const termineesCount = inscriptions.filter((i) => i.statut === 'TERMINEE').length
+  const currentCourse = enCoursList[0] ?? null
   const avgProgress = inscriptions.length
     ? Math.round(inscriptions.reduce((acc, i) => acc + i.progress_percent, 0) / inscriptions.length)
     : 0
 
-  const todayFormatted = new Date().toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const totalLecons = activeCourseDetail?.modules.reduce((sum, m) => sum + m.lecons.length, 0) ?? 0
+  const completedLecons = currentCourse && totalLecons ? Math.floor((currentCourse.progress_percent / 100) * totalLecons) : 0
 
-  // Calcul de la leçon/module où l'apprenant s'est arrêté
-  let flatLessons: { id: string; titre: string; moduleIndex: number; moduleTitle: string; leconIndex: number; globalIndex: number }[] = []
-  let activeModuleTitle = ''
-  let activeLessonTitle = ''
-  let activeModuleIndex = 1
-  let activeLessonIndex = 1
-  let activeLessonId = ''
+  const STATS = [
+    { icon: BookOpen, tone: 'sky', label: 'Formations en cours', value: enCoursList.length },
+    { icon: CheckCircle2, tone: 'emerald', label: 'Formations terminées', value: termineesCount },
+    { icon: TrendingUp, tone: 'indigo', label: 'Avancement moyen', value: `${avgProgress}%` },
+    {
+      icon: Award,
+      tone: 'amber',
+      label: 'Niveau Apprenant',
+      value: termineesCount > 3 ? 'Expert' : termineesCount > 0 ? 'Intermédiaire' : 'Débutant',
+    },
+  ] as const
 
-  if (activeCourseDetail && activeCourseDetail.modules) {
-    let indexCount = 0
-    activeCourseDetail.modules.forEach((mod, mIdx) => {
-      mod.lecons.forEach((lec, lIdx) => {
-        flatLessons.push({
-          id: lec.id,
-          titre: lec.titre,
-          moduleIndex: mIdx + 1,
-          moduleTitle: mod.titre,
-          leconIndex: lIdx + 1,
-          globalIndex: indexCount,
-        })
-        indexCount++
-      })
-    })
-
-    if (flatLessons.length > 0 && currentCourse) {
-      // Calcul de la leçon courante basé sur le % de progression
-      const completedCount = Math.floor((currentCourse.progress_percent / 100) * flatLessons.length)
-      const currentIndex = Math.min(completedCount, flatLessons.length - 1)
-      const currentLoc = flatLessons[currentIndex]
-
-      if (currentLoc) {
-        activeModuleTitle = currentLoc.moduleTitle
-        activeLessonTitle = currentLoc.titre
-        activeModuleIndex = currentLoc.moduleIndex
-        activeLessonIndex = currentLoc.leconIndex
-        activeLessonId = currentLoc.id
-      }
-    }
+  const TONE_CLASSES: Record<(typeof STATS)[number]['tone'], string> = {
+    sky: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400',
+    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+    indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400',
+    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
   }
 
+  const QUICK_LINKS = [
+    { to: '/apprenant/catalogue', icon: Compass, label: 'Catalogue', description: 'Découvrir de nouvelles formations' },
+    { to: '/apprenant/mes-formations', icon: GraduationCap, label: 'Mes formations', description: 'Toutes vos inscriptions' },
+    { to: '/apprenant/progression', icon: TrendingUp, label: 'Progression', description: 'Le détail de votre avancement' },
+    { to: '/apprenant/coach-ia', icon: MessageCircle, label: 'Coach IA', description: "Poser une question sur une leçon" },
+    { to: '/apprenant/bibliotheque', icon: Library, label: 'Bibliothèque', description: 'Documents et supports de cours' },
+  ]
+
   return (
-    <div className="space-y-6">
-      {/* BANNIÈRE DE BIENVENUE AVEC LE NOM DE L'APPRENANT */}
-      <div className="relative overflow-hidden rounded-3xl border border-sky-200/50 bg-gradient-to-br from-sky-600 via-sky-700 to-indigo-800 p-6 text-white shadow-xl shadow-sky-500/10 sm:p-8 dark:border-sky-500/20">
-        <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-sky-100 backdrop-blur-md">
-              <Sparkles size={14} className="text-amber-300" />
-              <span className="capitalize">{todayFormatted}</span>
-            </div>
-
-            <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
-              Bienvenue, {studentName} !
-            </h1>
-            <p className="mt-2 text-xs leading-relaxed text-sky-100/90 sm:text-sm">
-              Ravi de vous revoir. Poursuivez votre formation aujourd'hui et atteignez vos objectifs professionnels.
-            </p>
-          </div>
-
-          <div className="shrink-0">
-            <Link
-              to="/apprenant/catalogue"
-              className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-extrabold text-sky-900 shadow-lg transition-all hover:bg-sky-50 active:scale-95"
-            >
-              <Compass size={16} />
-              Explorer le catalogue
-            </Link>
-          </div>
-        </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      {/* EN-TÊTE SOBRE */}
+      <div className="text-center">
+        <h1 className="text-lg font-black text-slate-900 dark:text-slate-100">Bienvenue, {studentName} !</h1>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Voici un aperçu de votre parcours d'apprentissage.</p>
       </div>
 
-      {/* STATISTIQUES APPRENANT */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
-            <BookOpen size={22} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Formations en cours</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{enCoursList.length}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-            <CheckCircle2 size={22} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Formations terminées</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{termineesList.length}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
-            <TrendingUp size={22} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avancement moyen</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100">{avgProgress}%</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-            <Award size={22} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Niveau Apprenant</p>
-            <p className="text-sm font-black text-slate-900 dark:text-slate-100">
-              {termineesList.length > 3 ? 'Expert' : termineesList.length > 0 ? 'Intermédiaire' : 'Débutant'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* SECTION REPRENDRE L'APPRENTISSAGE (AVEC DETAIL DES MODULES ET LEÇONS) */}
-      {currentCourse ? (
-        <div className="overflow-hidden rounded-3xl border border-sky-200/80 bg-gradient-to-r from-sky-50/80 via-white to-indigo-50/50 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-md dark:border-sky-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/20 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-3 py-1 text-[11px] font-extrabold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-              <PlayCircle size={14} className="animate-pulse text-sky-500" />
-              Reprendre l'apprentissage
-            </span>
-            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-              {currentCourse.progress_percent}% de la formation complété
-            </span>
-          </div>
-
-          {/* TITRE ET ACTION CONTINUER */}
-          <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-            <div className="space-y-1">
-              <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">
-                {currentCourse.formation_titre}
-              </h2>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Niveau : {NIVEAU_LABELS[currentCourse.formation_niveau]}
-              </p>
-            </div>
-
-            <Link
-              to={`/apprenant/formations/${currentCourse.formation}${activeLessonId ? `?lecon=${activeLessonId}` : ''}`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 px-6 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-sky-500/25 transition-all hover:from-sky-700 hover:to-indigo-700 active:scale-95 shrink-0"
-            >
-              <span>Continuer la leçon</span>
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-
-          {/* BARRE DE PROGRESSION GLOBALE LUMINEUSE */}
-          <div className="mt-6">
-            <div className="flex justify-between text-[11px] font-bold text-slate-500 mb-1.5 dark:text-slate-400">
-              <span>Progression globale</span>
-              <span>{currentCourse.progress_percent}%</span>
-            </div>
-            <div className="h-3.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800 p-0.5">
+      {/* STATISTIQUES APPRENANT — largeur fixe, jamais étirées pour remplir la ligne */}
+      <div>
+        <p className="mb-3 text-center text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+          Statistiques
+        </p>
+        <div className="flex flex-wrap justify-center gap-4">
+          {STATS.map((stat) => {
+            const Icon = stat.icon
+            return (
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-400 via-sky-500 to-indigo-600 transition-all duration-500 shadow-sm"
-                style={{ width: `${currentCourse.progress_percent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* OÙ VOUS VOUS ÊTES ARRÊTÉ (ENCADRÉ SPÉCIFIQUE LEÇON / MODULE) */}
-          {activeLessonTitle && (
-            <div className="mt-6 rounded-2xl border border-sky-200 bg-white/80 p-4 shadow-sm dark:border-sky-800/60 dark:bg-slate-800/80">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white shadow-md shadow-sky-500/30">
-                  <MapPin size={18} />
+                key={stat.label}
+                className="w-[calc(50%-0.5rem)] shrink-0 rounded-2xl border border-slate-200/80 bg-white p-4 sm:w-44 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${TONE_CLASSES[stat.tone]}`}>
+                  <Icon size={18} />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                      Vous vous êtes arrêté ici :
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 mt-0.5">
-                    Module {activeModuleIndex} — {activeModuleTitle}
-                  </h4>
-                  <p className="text-xs font-bold text-sky-700 dark:text-sky-300 mt-0.5 flex items-center gap-1.5">
-                    <PlayCircle size={13} className="shrink-0" />
-                    Leçon {activeLessonIndex} : {activeLessonTitle}
-                  </p>
+                <p className="mt-3 text-xl font-black text-slate-900 dark:text-slate-100">{stat.value}</p>
+                <p className="text-[11px] font-medium text-slate-400">{stat.label}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* CONTINUER L'APPRENTISSAGE */}
+      {currentCourse && (
+        <div className="mx-auto w-full rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <p className="mb-3 text-center text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+            Reprendre l'apprentissage
+          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
+                <BookOpen size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {currentCourse.formation_titre}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {totalLecons > 0 ? `${completedLecons} / ${totalLecons} leçons` : `${currentCourse.progress_percent}% complété`}
+                </p>
+                <div className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-sky-500 transition-all duration-500"
+                    style={{ width: `${currentCourse.progress_percent}%` }}
+                  />
                 </div>
               </div>
             </div>
-          )}
 
-          {/* STEPPER HORIZONTAL - PARCOURS RECOMMANDÉ */}
-          {activeCourseDetail && activeCourseDetail.modules.length > 0 && (
-            <div className="mt-6 border-t border-slate-200/60 pt-6 dark:border-slate-800">
-              <RecommendedPathStepper
-                courseTitle={currentCourse.formation_titre}
-                modules={activeCourseDetail.modules}
-                completedLessonIds={flatLessons
-                  .filter((f) => f.globalIndex < Math.floor((currentCourse.progress_percent / 100) * flatLessons.length))
-                  .map((f) => f.id)}
-                activeModuleIndex={Math.max(0, activeModuleIndex - 1)}
-                onSelectModule={(_modIdx, firstLecId) => {
-                  navigate(`/apprenant/formations/${currentCourse.formation}${firstLecId ? `?lecon=${firstLecId}` : ''}`)
-                }}
-              />
-            </div>
-          )}
-
-          {/* DÉTAIL ET PROGRESSION PAR MODULE & LEÇON */}
-          {activeCourseDetail && activeCourseDetail.modules.length > 0 && (
-            <div className="mt-6 border-t border-slate-200/60 pt-4 dark:border-slate-800">
-              <button
-                onClick={() => setShowLessonBreakdown(!showLessonBreakdown)}
-                className="flex items-center justify-between w-full text-xs font-bold text-slate-700 hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-400 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <BookOpen size={15} className="text-sky-500" />
-                  Progression détaillée du contenu ({activeCourseDetail.modules.length} modules, {flatLessons.length} leçons)
-                </span>
-                {showLessonBreakdown ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
-
-              {showLessonBreakdown && (
-                <div className="mt-4 space-y-4">
-                  {activeCourseDetail.modules.map((module, mIdx) => {
-                    const moduleLessons = module.lecons
-                    const totalModLecons = moduleLessons.length
-
-                    return (
-                      <div
-                        key={module.id}
-                        className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 dark:border-slate-800/80 dark:bg-slate-900/60"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-xs font-black text-slate-900 dark:text-slate-100">
-                            Module {mIdx + 1} — {module.titre}
-                          </h3>
-                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-md">
-                            {totalModLecons} leçon{totalModLecons > 1 ? 's' : ''}
-                          </span>
-                        </div>
-
-                        {/* LISTE DES LEÇONS ET STATUT DE PROGRESSION */}
-                        <div className="space-y-2">
-                          {moduleLessons.map((lecon, lIdx) => {
-                            const flatItem = flatLessons.find((f) => f.id === lecon.id)
-                            const completedCount = Math.floor((currentCourse.progress_percent / 100) * flatLessons.length)
-                            const isCompleted = flatItem ? flatItem.globalIndex < completedCount : false
-                            const isCurrent = flatItem ? flatItem.globalIndex === Math.min(completedCount, flatLessons.length - 1) : false
-
-                            return (
-                              <Link
-                                key={lecon.id}
-                                to={`/apprenant/formations/${currentCourse.formation}?lecon=${lecon.id}`}
-                                className={`group flex items-center justify-between rounded-xl p-2.5 transition-all text-xs ${isCurrent
-                                    ? 'bg-sky-50 border border-sky-300/80 font-bold text-sky-900 shadow-sm dark:bg-sky-950/40 dark:border-sky-800 dark:text-sky-200'
-                                    : isCompleted
-                                      ? 'bg-slate-50/80 text-slate-700 dark:bg-slate-800/30 dark:text-slate-300 hover:bg-sky-50/50'
-                                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50'
-                                  }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  {isCompleted ? (
-                                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-                                  ) : isCurrent ? (
-                                    <PlayCircle size={16} className="text-sky-600 animate-pulse shrink-0" />
-                                  ) : (
-                                    <Circle size={16} className="text-slate-300 dark:text-slate-600 shrink-0" />
-                                  )}
-
-                                  <span className="truncate">
-                                    Leçon {lIdx + 1} : {lecon.titre}
-                                  </span>
-                                </div>
-
-                                <div className="shrink-0 flex items-center gap-2 ml-2">
-                                  {isCurrent && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500 px-2 py-0.5 text-[9px] font-black text-white shadow-xs">
-                                      En cours
-                                    </span>
-                                  )}
-                                  {isCompleted && (
-                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                      Terminée
-                                    </span>
-                                  )}
-                                  {!isCompleted && !isCurrent && (
-                                    <span className="text-[10px] font-semibold text-slate-400">
-                                      À venir
-                                    </span>
-                                  )}
-                                  <ArrowRight size={13} className="text-slate-400 group-hover:translate-x-0.5 transition-transform group-hover:text-sky-600" />
-                                </div>
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-8 text-center shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
-            <BookOpen size={24} />
+            <Link
+              to={`/apprenant/formations/${currentCourse.formation}`}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-sky-700"
+            >
+              <Play size={13} fill="currentColor" />
+              Continuer
+            </Link>
           </div>
-          <h2 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">
-            Vous n'avez pas de formation en cours
-          </h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Inscrivez-vous à une formation dans le catalogue pour lancer votre apprentissage.
-          </p>
-          <Link
-            to="/apprenant/catalogue"
-            className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-sky-700"
-          >
-            Découvrir le catalogue
-          </Link>
         </div>
       )}
 
-      {/* FORMATIONS POPULAIRES RECOMMANDÉES */}
+      {/* RACCOURCIS RAPIDES */}
       <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Sparkles size={18} className="text-sky-500" />
-            Formations recommandées
-          </h2>
-          <Link
-            to="/apprenant/catalogue"
-            className="text-xs font-bold text-sky-600 hover:underline dark:text-sky-400"
-          >
-            Voir tout →
-          </Link>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          {catalogue.map((formation) => (
-            <Link
-              key={formation.id}
-              to={`/apprenant/formations/${formation.id}`}
-              className="group flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-md shadow-slate-500/5 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-sky-300 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/90 dark:hover:border-sky-500/30"
-            >
-              <div>
-                <span className="inline-flex items-center rounded-xl bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300 mb-2">
-                  {formation.categorie_nom}
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-400 line-clamp-1">
-                  {formation.titre}
-                </h3>
-                <p className="mt-1.5 text-[11px] text-slate-500 line-clamp-2 dark:text-slate-400">
-                  {formation.description || 'Découvrez ce cours complet.'}
-                </p>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-[11px] font-medium text-slate-400 dark:border-slate-800">
-                <span className="flex items-center gap-1">
-                  <Clock size={12} /> {formation.duree_heures} h
-                </span>
-                <span className="text-sky-600 font-bold dark:text-sky-400 group-hover:translate-x-0.5 transition-transform">
-                  Voir →
-                </span>
-              </div>
-            </Link>
-          ))}
+        <p className="mb-3 text-center text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+          Raccourcis
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {QUICK_LINKS.map((link) => {
+            const Icon = link.icon
+            return (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="group flex w-full shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 transition-colors hover:border-sky-300 sm:w-72 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-500/40"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 transition-colors group-hover:bg-sky-500 group-hover:text-white dark:bg-sky-500/10 dark:text-sky-400">
+                  <Icon size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">{link.label}</p>
+                  <p className="truncate text-[11px] text-slate-400">{link.description}</p>
+                </div>
+                <ChevronRight size={16} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-sky-500" />
+              </Link>
+            )
+          })}
         </div>
       </div>
+
+      {/* ACTIVITÉ RÉCENTE */}
+      {inscriptions.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <p className="mb-4 text-center text-[11px] font-bold tracking-wider text-slate-400 uppercase dark:text-slate-500">
+            Activité récente
+          </p>
+          <div className="space-y-4">
+            {inscriptions.slice(0, 5).map((inscription) => (
+              <Link
+                key={inscription.id}
+                to={`/apprenant/formations/${inscription.formation}`}
+                className="group flex items-center justify-between gap-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-700 group-hover:text-sky-600 dark:text-slate-300 dark:group-hover:text-sky-400">
+                    {inscription.formation_titre}
+                  </p>
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        inscription.statut === 'TERMINEE' ? 'bg-emerald-500' : 'bg-sky-500'
+                      }`}
+                      style={{ width: `${inscription.progress_percent}%` }}
+                    />
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 text-xs font-bold ${
+                    inscription.statut === 'TERMINEE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'
+                  }`}
+                >
+                  {inscription.progress_percent}%
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

@@ -1,5 +1,6 @@
 import { Delete, History, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { BackToToolsLink } from '../../components/BackToToolsLink'
 
 type AngleMode = 'DEG' | 'RAD'
 
@@ -270,7 +271,10 @@ export function CalculatricePage() {
   const display = result ?? (expression || '0')
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 lg:flex-row">
+    <div className="mx-auto max-w-4xl space-y-4">
+      <BackToToolsLink />
+
+      <div className="flex flex-col gap-6 lg:flex-row">
       {/* --- Calculatrice --- */}
       <div className="flex-1 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 dark:border-slate-800 dark:bg-slate-900">
         {/* Écran */}
@@ -398,6 +402,7 @@ export function CalculatricePage() {
             </ul>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

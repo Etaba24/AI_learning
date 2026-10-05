@@ -49,7 +49,13 @@ class InscriptionDetailView(generics.RetrieveDestroyAPIView):
 
 class ProgressionUpdateView(APIView):
     """POST /api/inscriptions/<inscription_id>/lecons/<lecon_id>/progress/
-    Logique Métier RG-005 : Une leçon est terminée si la vidéo est vue à 90%+ ou le quiz est réussi."""
+    Logique Métier RG-005 : une leçon est terminée si sa vidéo est vue à
+    90%+. Réservé au suivi VIDÉO — un score de QCM ne passe jamais par ici :
+    accepter un `score` tel quel envoyé par le client reviendrait à laisser
+    n'importe qui valider n'importe quelle leçon d'un simple POST
+    {"score": 100}, sans avoir répondu à la moindre question. La seule voie
+    légitime pour un score de QCM est QuizSubmitView (assessments.views),
+    qui le calcule lui-même côté serveur à partir des vraies réponses."""
 
     permission_classes = [IsAuthenticated]
 
@@ -66,44 +72,39 @@ class ProgressionUpdateView(APIView):
         # avoir terminé les précédentes (le vrai contournement constaté ne
         # passait pas seulement par l'URL de FormationDetailPage, mais aussi
         # par cet endpoint, qui ne vérifiait rien).
-        from enrollments.services import get_locked_lecon_ids
+        from enrollments.services import get_locked_lecon_ids, marquer_inscription_terminee_si_complete
 
         if lecon.id in get_locked_lecon_ids(inscription.formation, inscription):
             raise PermissionDenied("Cette leçon est verrouillée : terminez les leçons précédentes d'abord.")
 
         video_percent = int(request.data.get("video_progression_percent", 0))
-        score = request.data.get("score")
+        lu = bool(request.data.get("lu"))
 
         progression, _ = Progression.objects.get_or_create(
             inscription=inscription,
             lecon=lecon,
             defaults={"statut": Progression.Statut.EN_COURS}
         )
-
         progression.video_progression_percent = max(progression.video_progression_percent, video_percent)
-        if score is not None:
-            progression.score = float(score)
 
-        # Logique Métier RG-005
-        is_completed = False
-        if progression.video_progression_percent >= 90:
-            is_completed = True
-        if score is not None and float(score) >= 70:
-            is_completed = True
-
-        if is_completed:
-            progression.statut = Progression.Statut.TERMINEE
+        if lecon.quiz.exists():
+            # Cette leçon a un QCM : seul QuizSubmitView (score calculé
+            # côté serveur) a l'autorité pour la marquer Terminée — `lu`
+            # est ignoré ici, sinon on contournerait le QCM en un POST.
+            if progression.statut != Progression.Statut.TERMINEE:
+                progression.statut = Progression.Statut.EN_COURS
         else:
-            progression.statut = Progression.Statut.EN_COURS
+            # Pas de QCM sur cette leçon : rien à contourner derrière un
+            # `lu` (pas de bonne réponse à deviner), donc un simple
+            # acquiescement de l'apprenant — ou 90%+ de la vidéo si elle en
+            # a une — suffit à la valider.
+            if lu or progression.video_progression_percent >= 90:
+                progression.statut = Progression.Statut.TERMINEE
+            elif progression.statut != Progression.Statut.TERMINEE:
+                progression.statut = Progression.Statut.EN_COURS
 
         progression.save()
 
-        # Met à jour le statut global de l'inscription si toutes les leçons sont terminées
-        total_lecons = Lecon.objects.filter(module__formation=inscription.formation).count()
-        completed_count = Progression.objects.filter(inscription=inscription, statut=Progression.Statut.TERMINEE).count()
-
-        if total_lecons > 0 and completed_count == total_lecons:
-            inscription.statut = Inscription.Statut.TERMINEE
-            inscription.save()
+        marquer_inscription_terminee_si_complete(inscription, inscription.formation)
 
         return Response(ProgressionSerializer(progression).data, status=status.HTTP_200_OK)

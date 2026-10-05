@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Moon,
   PanelLeftClose,
@@ -59,6 +60,7 @@ export function AdminLayout() {
         { to: '/admin/documents', label: t('admin.nav.documents'), icon: CheckCircle, end: false },
         { to: '/admin/categories', label: t('admin.nav.categories'), icon: Tags, end: false },
         { to: '/admin/departements', label: t('admin.nav.departements'), icon: Building2, end: false },
+        { to: '/admin/annonces', label: t('admin.nav.annonces'), icon: Megaphone, end: false },
       ],
     },
     {
@@ -86,6 +88,7 @@ export function AdminLayout() {
     '/admin/documents': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.documents', { returnObjects: true }) as { title: string; subtitle: string }) },
     '/admin/categories': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.categories', { returnObjects: true }) as { title: string; subtitle: string }) },
     '/admin/departements': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.departements', { returnObjects: true }) as { title: string; subtitle: string }) },
+    '/admin/annonces': { category: t('admin.nav.pedagogy'), ...(t('admin.pageTitles.annonces', { returnObjects: true }) as { title: string; subtitle: string }) },
     '/admin/logs': { category: t('admin.nav.security'), ...(t('admin.pageTitles.logs', { returnObjects: true }) as { title: string; subtitle: string }) },
     '/admin/settings': { category: t('admin.nav.security'), ...(t('admin.pageTitles.settings', { returnObjects: true }) as { title: string; subtitle: string }) },
   }
@@ -145,11 +148,10 @@ export function AdminLayout() {
   }, [])
 
   function handleOpenNotifications() {
-    const next = !showNotifications
-    setShowNotifications(next)
-    if (next) {
-      setNotifications((current) => current.map((item) => ({ ...item, read: true })))
-    }
+    // Ne marque plus tout comme lu à l'ouverture : sinon l'indicateur
+    // "non lue" disparaissait avant même d'avoir pu la voir/cliquer —
+    // seul un clic sur une notification précise la marque comme lue.
+    setShowNotifications((current) => !current)
   }
 
   function handleNotificationClick(path: string) {

@@ -6,7 +6,9 @@ de son module ET que ce module est déverrouillé, ou si la leçon précédente
 du même module est terminée. Un module est déverrouillé si c'est le premier,
 ou si toutes les leçons du module précédent sont terminées."""
 
-from .models import Progression
+from trainings.models import Lecon
+
+from .models import Inscription, Progression
 
 
 def get_locked_lecon_ids(formation, inscription):
@@ -40,3 +42,20 @@ def get_locked_lecon_ids(formation, inscription):
         module_unlocked = bool(lecons) and all(lecon.id in completed_lecon_ids for lecon in lecons)
 
     return locked_ids
+
+
+def marquer_inscription_terminee_si_complete(inscription, formation):
+    """Factorisé entre ProgressionUpdateView (vidéo) et QuizSubmitView
+    (QCM) : les deux font progresser une leçon par des voies différentes,
+    mais la règle qui en découle — la formation entière est "Terminée" une
+    fois TOUTES ses leçons validées — est unique, pas dupliquée deux fois
+    avec le risque qu'elles divergent."""
+
+    total_lecons = Lecon.objects.filter(module__formation=formation).count()
+    completed_count = Progression.objects.filter(
+        inscription=inscription, statut=Progression.Statut.TERMINEE
+    ).count()
+
+    if total_lecons > 0 and completed_count == total_lecons:
+        inscription.statut = Inscription.Statut.TERMINEE
+        inscription.save()

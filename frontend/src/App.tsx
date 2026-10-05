@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ToastContext'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminLogsPage } from './pages/admin/AdminLogsPage'
 import { ApprenantsPage } from './pages/admin/ApprenantsPage'
+import { AnnoncesPage } from './pages/admin/AnnoncesPage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { DepartementsPage } from './pages/admin/DepartementsPage'
@@ -41,9 +42,12 @@ import { FormationDetailPage } from './pages/student/FormationDetailPage'
 import { IdePage } from './pages/student/IdePage'
 import { LibraryPage } from './pages/student/LibraryPage'
 import { MessagerieChatPage } from './pages/student/MessagerieChatPage'
+import { ArduinoPage } from './pages/student/ArduinoPage'
+import { CartographiePage } from './pages/student/CartographiePage'
 import { ChimiePage } from './pages/student/ChimiePage'
 import { Modelisation3DPage } from './pages/student/Modelisation3DPage'
 import { MyCoursesPage } from './pages/student/MyCoursesPage'
+import { ProgressionPage } from './pages/student/ProgressionPage'
 import { NewsPage } from './pages/student/NewsPage'
 import { NotesPage } from './pages/student/NotesPage'
 import { StudentDashboardPage } from './pages/student/StudentDashboardPage'
@@ -87,6 +91,7 @@ function App() {
             <Route path="apprenants" element={<ApprenantsPage />} />
             <Route path="formateurs" element={<FormateursPage />} />
             <Route path="categories" element={<CategoriesPage />} />
+            <Route path="annonces" element={<AnnoncesPage />} />
             <Route path="departements" element={<DepartementsPage />} />
             <Route path="etablissements" element={<EtablissementsPage />} />
             <Route path="abonnements" element={<AbonnementsPage />} />
@@ -132,6 +137,7 @@ function App() {
             <Route index element={<StudentDashboardPage />} />
             <Route path="catalogue" element={<CataloguePage />} />
             <Route path="mes-formations" element={<MyCoursesPage />} />
+            <Route path="progression" element={<ProgressionPage />} />
             <Route path="coach-ia" element={<CoachIAPage />} />
             <Route path="messagerie" element={<PremiumGate><MessagerieChatPage /></PremiumGate>} />
             <Route path="actualites" element={<NewsPage />} />
@@ -145,6 +151,8 @@ function App() {
             <Route path="outils/tableau-blanc" element={<PremiumGate tool="TABLEAU_BLANC"><TableauBlancPage /></PremiumGate>} />
             <Route path="outils/modelisation-3d" element={<PremiumGate tool="MODELISATION_3D"><Modelisation3DPage /></PremiumGate>} />
             <Route path="outils/chimie-3d" element={<PremiumGate tool="CHIMIE_3D"><ChimiePage /></PremiumGate>} />
+            <Route path="outils/cartographie" element={<PremiumGate tool="CARTOGRAPHIE"><CartographiePage /></PremiumGate>} />
+            <Route path="outils/arduino" element={<PremiumGate tool="ARDUINO"><ArduinoPage /></PremiumGate>} />
             <Route path="parametres" element={<ParametresPage />} />
           </Route>
         </Route>

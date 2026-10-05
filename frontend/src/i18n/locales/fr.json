@@ -203,6 +203,7 @@
       "allFormations": "Toutes les formations",
       "documents": "Bibliothèque (validation)",
       "categories": "Catégories",
+      "annonces": "Annonces",
       "departements": "Départements",
       "monetization": "Monétisation",
       "etablissements": "Établissements",
@@ -219,6 +220,7 @@
       "allFormations": { "title": "Catalogue des formations", "subtitle": "Suivi et gestion de l'ensemble des modules pédagogiques." },
       "documents": { "title": "Validation de la bibliothèque", "subtitle": "Modérez les documents PDF/EPUB déposés par les formateurs." },
       "categories": { "title": "Catégories", "subtitle": "Organisation et arborescence des thématiques de formation." },
+      "annonces": { "title": "Annonces", "subtitle": "Annonces affichées sur la page Actualités des apprenants." },
       "departements": { "title": "Départements", "subtitle": "Un formateur ne peut publier que dans son propre département." },
       "logs": { "title": "Journaux d'activité", "subtitle": "Audit de sécurité et traçabilité des actions sensibles." },
       "settings": { "title": "Paramètres globaux", "subtitle": "Configuration générale et options de la plateforme." }
@@ -325,6 +327,7 @@
       "dashboard": "Tableau de bord",
       "catalogue": "Catalogue des formations",
       "mesFormations": "Mes formations",
+      "progression": "Progression",
       "coachIa": "Coach IA",
       "messagerie": "Messagerie",
       "ressources": "Ressources & Fil d'actus",
@@ -334,9 +337,10 @@
       "abonnement": "Abonnement"
     },
     "pageTitles": {
-      "dashboard": { "category": "Accueil", "title": "Tableau de bord", "subtitle": "Aperçu global de votre parcours et de votre progression." },
+      "dashboard": { "category": "Accueil", "title": "Tableau de bord", "subtitle": "Vos chiffres clés et les raccourcis vers le reste de l'espace." },
       "catalogue": { "category": "Catalogue", "title": "Catalogue des formations", "subtitle": "Explorez et découvrez vos prochains cours." },
       "mesFormations": { "category": "Mes cours", "title": "Mes formations", "subtitle": "Retrouvez votre progression et vos cours suivis." },
+      "progression": { "category": "Progression", "title": "Ma progression", "subtitle": "Le détail de votre avancement, module par module et leçon par leçon." },
       "coachIa": { "category": "Coach IA", "title": "Coach IA", "subtitle": "Posez vos questions sur la leçon en cours à votre tuteur IA." },
       "messagerie": { "category": "Messagerie", "title": "Messagerie", "subtitle": "Discutez avec les formateurs des formations auxquelles vous êtes inscrit." },
       "actualites": { "category": "Actualités", "title": "Actualités & Nouveautés", "subtitle": "Découvrez les formations nouvellement partagées et les annonces." },
@@ -348,6 +352,8 @@
       "outilsCalculatrice": { "category": "Outils", "title": "Calculatrice scientifique", "subtitle": "Trigonométrie, logarithmes, puissances, mémoire et historique." },
       "outilsTableauBlanc": { "category": "Outils", "title": "Tableau blanc", "subtitle": "Dessinez vos schémas et mind-maps, sauvegardés dans votre espace." },
       "outilsModelisation3d": { "category": "Outils", "title": "Modélisation 3D", "subtitle": "Assemblez des formes en 3D : déplacez, pivotez, colorez, sauvegardez." },
+      "outilsCartographie": { "category": "Outils", "title": "Cartographie", "subtitle": "Placez des repères, mesurez des distances et délimitez des zones sur une carte interactive." },
+      "outilsArduino": { "category": "Outils", "title": "Systèmes embarqués", "subtitle": "Programmez une carte Arduino virtuelle et testez votre croquis en direct." },
       "abonnement": { "category": "Compte", "title": "Abonnement", "subtitle": "Votre situation et les formules disponibles." },
       "parametres": { "category": "Compte", "title": "Paramètres", "subtitle": "Gérez votre profil, votre mot de passe et vos préférences." }
     }

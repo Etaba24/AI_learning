@@ -15,9 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+
+from core.views import serve_media_range
 
 urlpatterns = [
     path(settings.ADMIN_URL_PATH, admin.site.urls),
@@ -36,9 +37,17 @@ urlpatterns = [
     path('api/', include('messaging.urls')),
     path('api/', include('library.urls')),
     path('api/', include('chemistry.urls')),
+    path('api/', include('cartography.urls')),
+    path('api/', include('embedded.urls')),
+    path('api/', include('news.urls')),
 ]
 
-# Sert les fichiers déposés (PDF/EPUB) en développement — en production, un
-# vrai serveur web/objet storage s'en charge, jamais Django lui-même.
+# Sert les fichiers déposés (vidéos, PDF/EPUB...) en développement — en
+# production, un vrai serveur web/objet storage s'en charge, jamais Django
+# lui-même. Vue maison (pas le static() standard de Django) : elle seule
+# honore les requêtes Range, indispensables à la lecture des vidéos de
+# leçon dans le navigateur (voir core.views.serve_media_range).
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [
+        re_path(rf"^{settings.MEDIA_URL.lstrip('/')}(?P<path>.*)$", serve_media_range),
+    ]

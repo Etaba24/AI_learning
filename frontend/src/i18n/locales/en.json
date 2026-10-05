@@ -203,6 +203,7 @@
       "allFormations": "All courses",
       "documents": "Library (validation)",
       "categories": "Categories",
+      "annonces": "Announcements",
       "departements": "Departments",
       "monetization": "Monetization",
       "etablissements": "Institutions",
@@ -219,6 +220,7 @@
       "allFormations": { "title": "Course catalog", "subtitle": "Tracking and management of all course modules." },
       "documents": { "title": "Library validation", "subtitle": "Moderate PDF/EPUB documents submitted by instructors." },
       "categories": { "title": "Categories", "subtitle": "Organization and structure of course topics." },
+      "annonces": { "title": "Announcements", "subtitle": "Announcements shown on students' News page." },
       "departements": { "title": "Departments", "subtitle": "An instructor can only publish within their own department." },
       "logs": { "title": "Activity logs", "subtitle": "Security audit and traceability of sensitive actions." },
       "settings": { "title": "Global settings", "subtitle": "General configuration and platform options." }
@@ -325,6 +327,7 @@
       "dashboard": "Dashboard",
       "catalogue": "Course catalog",
       "mesFormations": "My courses",
+      "progression": "Progress",
       "coachIa": "AI Coach",
       "messagerie": "Messaging",
       "ressources": "Resources & News",
@@ -334,9 +337,10 @@
       "abonnement": "Subscription"
     },
     "pageTitles": {
-      "dashboard": { "category": "Home", "title": "Dashboard", "subtitle": "Overall view of your journey and progress." },
+      "dashboard": { "category": "Home", "title": "Dashboard", "subtitle": "Your key numbers and shortcuts to the rest of your space." },
       "catalogue": { "category": "Catalog", "title": "Course catalog", "subtitle": "Explore and discover your next courses." },
       "mesFormations": { "category": "My courses", "title": "My courses", "subtitle": "Track your progress and enrolled courses." },
+      "progression": { "category": "Progress", "title": "My progress", "subtitle": "The detail of your progress, module by module and lesson by lesson." },
       "coachIa": { "category": "AI Coach", "title": "AI Coach", "subtitle": "Ask your AI tutor questions about the current lesson." },
       "messagerie": { "category": "Messaging", "title": "Messaging", "subtitle": "Chat with the instructors of the courses you're enrolled in." },
       "actualites": { "category": "News", "title": "News & Updates", "subtitle": "Discover newly shared courses and announcements." },
@@ -348,6 +352,8 @@
       "outilsCalculatrice": { "category": "Tools", "title": "Scientific calculator", "subtitle": "Trigonometry, logarithms, powers, memory and history." },
       "outilsTableauBlanc": { "category": "Tools", "title": "Whiteboard", "subtitle": "Draw your diagrams and mind maps, saved to your space." },
       "outilsModelisation3d": { "category": "Tools", "title": "3D Modeling", "subtitle": "Assemble 3D shapes: move, rotate, color, save." },
+      "outilsCartographie": { "category": "Tools", "title": "Cartography", "subtitle": "Place markers, measure distances, and outline areas on an interactive map." },
+      "outilsArduino": { "category": "Tools", "title": "Embedded systems", "subtitle": "Program a virtual Arduino board and test your sketch live." },
       "abonnement": { "category": "Account", "title": "Subscription", "subtitle": "Your status and the available plans." },
       "parametres": { "category": "Account", "title": "Settings", "subtitle": "Manage your profile, password and preferences." }
     }

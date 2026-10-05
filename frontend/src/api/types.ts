@@ -93,6 +93,8 @@ export const OUTIL_LABELS: Record<OutilCode, string> = {
   TABLEAU_BLANC: 'Tableau blanc',
   MODELISATION_3D: 'Modélisation 3D',
   CHIMIE_3D: 'Laboratoire de chimie 3D',
+  CARTOGRAPHIE: 'Cartographie',
+  ARDUINO: 'Systèmes embarqués (Arduino)',
 }
 
 export interface Formation {
@@ -143,6 +145,38 @@ export interface Exercice {
   correction: string
 }
 
+// QCM réel (RF-011) — une bonne réponse par question, contrairement à
+// Exercice (texte libre auto-évalué par l'apprenant lui-même, sans
+// vérification). RG-006 : seuil_reussite en % pour valider la leçon.
+export interface Choice {
+  id: string
+  texte: string
+  est_correcte: boolean
+}
+
+export interface Question {
+  id: string
+  enonce: string
+  ordre: number
+  choix: Choice[]
+}
+
+export interface Quiz {
+  id: string
+  titre: string
+  seuil_reussite: number
+  questions: Question[]
+}
+
+// Réponse de POST /quiz/<id>/soumettre/ — score calculé côté serveur
+// (jamais fourni par le client), correction révélée seulement après coup.
+export interface QuizResult {
+  score: number
+  seuil_reussite: number
+  reussi: boolean
+  correction: Record<string, string | null>
+}
+
 export interface PublicLecon {
   id: string
   titre: string
@@ -151,6 +185,7 @@ export interface PublicLecon {
   ordre: number
   ressources?: Ressource[]
   exercices?: Exercice[]
+  quiz?: Quiz[]
 }
 
 export interface PublicModule {
@@ -198,6 +233,8 @@ export type OutilCode =
   | 'TABLEAU_BLANC'
   | 'MODELISATION_3D'
   | 'CHIMIE_3D'
+  | 'CARTOGRAPHIE'
+  | 'ARDUINO'
 
 export interface MonAbonnement {
   actif: boolean
@@ -385,4 +422,47 @@ export interface LibraryDocument {
   statut: DocumentStatut
   motif_refus: string
   created_at: string
+}
+
+// Annonces de plateforme (page Actualités, section "Annonces de la
+// communauté") — gérées par un administrateur, distinctes des nouveautés
+// du catalogue qui viennent automatiquement des formations publiées.
+export type AnnonceCategorie = 'ANNONCE_PLATEFORME' | 'FONCTIONNALITE' | 'EVENEMENT' | 'AUTRE'
+
+export const ANNONCE_CATEGORIE_LABELS: Record<AnnonceCategorie, string> = {
+  ANNONCE_PLATEFORME: 'Annonce Plateforme',
+  FONCTIONNALITE: 'Fonctionnalité',
+  EVENEMENT: 'Événement',
+  AUTRE: 'Autre',
+}
+
+export interface Annonce {
+  id: string
+  titre: string
+  categorie: AnnonceCategorie
+  categorie_display: string
+  contenu: string
+  auteur_label: string
+  important: boolean
+  created_at: string
+}
+
+// Tableau de bord formateur (/api/formateur/stats/) — uniquement des
+// chiffres réels (formations possédées, apprenants effectivement inscrits,
+// progressions réelles) : pas de note de satisfaction, aucun système de
+// notation n'existe côté backend.
+export interface InstructorActivityItem {
+  apprenant_nom: string
+  formation_titre: string
+  lecon_titre: string
+  statut: 'NON_COMMENCEE' | 'EN_COURS' | 'TERMINEE'
+  updated_at: string
+}
+
+export interface InstructorStats {
+  total_formations: number
+  published_formations: number
+  pending_formations: number
+  total_students: number
+  recent_activity: InstructorActivityItem[]
 }

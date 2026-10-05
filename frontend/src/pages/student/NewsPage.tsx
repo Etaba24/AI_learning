@@ -2,53 +2,16 @@ import { Newspaper, Sparkles, Clock, ArrowRight, Compass, Calendar, UserCheck, F
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch, ApiError } from '../../api/client'
-import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type PaginatedResponse, type PublicFormation } from '../../api/types'
+import { DEFAULT_PAGE_SIZE, NIVEAU_LABELS, type Annonce, type PaginatedResponse, type PublicFormation } from '../../api/types'
 import { Alert } from '../../components/Alert'
 import { Pagination } from '../../components/Pagination'
 import { useRealtimeTopics } from '../../hooks/useRealtimeTopics'
-
-interface NewsAnnouncement {
-  id: string
-  title: string
-  category: string
-  date: string
-  content: string
-  author: string
-  isHot?: boolean
-}
-
-const PLATFORM_ANNOUNCEMENTS: NewsAnnouncement[] = [
-  {
-    id: 'ann-1',
-    title: 'Mise à jour majeure du catalogue de cours IA & Data Science',
-    category: 'Annonce Plateforme',
-    date: 'Aujourd’hui',
-    content: 'De nouvelles formations axées sur les grands modèles de langage (LLM) et le Machine Learning appliqué ont été ajoutées pour tous les apprenants.',
-    author: 'Équipe Pédagogique',
-    isHot: true,
-  },
-  {
-    id: 'ann-2',
-    title: 'Lancement du nouveau système de suivi d’apprentissage',
-    category: 'Fonctionnalité',
-    date: 'Hier',
-    content: 'Vous pouvez désormais suivre l’état précis de vos leçons directement depuis votre tableau de bord interactif.',
-    author: 'Support Technique',
-  },
-  {
-    id: 'ann-3',
-    title: 'Webinaire gratuit : Réussir sa reconversion dans le développement Web',
-    category: 'Événement',
-    date: 'Il y a 3 jours',
-    content: 'Rejoignez nos experts formateurs ce vendredi à 18h pour une session de questions/réponses en direct.',
-    author: 'Communauté AI Learning',
-  },
-]
 
 export function NewsPage() {
   const [recentFormations, setRecentFormations] = useState<PublicFormation[] | null>(null)
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
+  const [annonces, setAnnonces] = useState<Annonce[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function loadFormations() {
@@ -60,8 +23,16 @@ export function NewsPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Erreur lors du chargement des actualités.'))
   }
 
+  function loadAnnonces() {
+    apiFetch<PaginatedResponse<Annonce>>('/catalogue/annonces/')
+      .then((data) => setAnnonces(data.results))
+      .catch(() => setAnnonces([]))
+  }
+
   useEffect(loadFormations, [page])
+  useEffect(loadAnnonces, [])
   useRealtimeTopics(['catalogue'], loadFormations)
+  useRealtimeTopics(['annonces'], loadAnnonces)
 
   if (error) {
     return <Alert variant="error" message={error} />
@@ -90,7 +61,7 @@ export function NewsPage() {
           </div>
 
           <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
-            Formations récemment partagées 🚀
+            Formations récemment partagées
           </h1>
           <p className="mt-2 text-xs leading-relaxed text-sky-100/90 sm:text-sm">
             Restez informé des nouveaux cours publiés, des mises à jour pédagogiques et des annonces exclusives de la plateforme AI Learning.
@@ -187,42 +158,52 @@ export function NewsPage() {
           </h2>
         </div>
 
-        <div className="space-y-4">
-          {PLATFORM_ANNOUNCEMENTS.map((ann) => (
-            <div
-              key={ann.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90"
-            >
-              <div className="flex items-start gap-4">
-                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
-                  <Compass size={20} />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {ann.category}
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                      <Calendar size={12} /> {ann.date}
-                    </span>
-                    {ann.isHot && (
-                      <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">
-                        Important
-                      </span>
-                    )}
+        {!annonces ? (
+          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+          </div>
+        ) : annonces.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
+            <p className="text-xs font-bold text-slate-400">Aucune annonce pour le moment.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {annonces.map((ann) => (
+              <div
+                key={ann.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
+                    <Compass size={20} />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">{ann.title}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{ann.content}</p>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        {ann.categorie_display}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Calendar size={12} /> {new Date(ann.created_at).toLocaleDateString('fr-FR')}
+                      </span>
+                      {ann.important && (
+                        <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 dark:bg-rose-500/10 dark:text-rose-400">
+                          Important
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">{ann.titre}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{ann.contenu}</p>
+                  </div>
+                </div>
+
+                <div className="shrink-0 text-right sm:border-l sm:border-slate-100 sm:pl-4 dark:border-slate-800">
+                  <span className="text-[11px] font-semibold text-slate-400 block">Publié par</span>
+                  <span className="text-xs font-bold text-sky-600 dark:text-sky-400">{ann.auteur_label}</span>
                 </div>
               </div>
-
-              <div className="shrink-0 text-right sm:border-l sm:border-slate-100 sm:pl-4 dark:border-slate-800">
-                <span className="text-[11px] font-semibold text-slate-400 block">Publié par</span>
-                <span className="text-xs font-bold text-sky-600 dark:text-sky-400">{ann.author}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
